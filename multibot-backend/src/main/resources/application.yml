@@ -37,6 +37,7 @@ spring:
     locations:
       - classpath:db/migration/common
       - classpath:db/migration/tenant
+      - classpath:db/migration/file
       # Kolejne moduły dodawane gdy implementujemy:
       # - classpath:db/migration/document
       # - classpath:db/migration/chat
@@ -127,6 +128,10 @@ multibot:
 
 server:
   port: 8080
+  tomcat:
+    accesslog:
+      enabled: true
+      pattern: '%t %a "%r" %s %b %D'
 
 management:
   endpoints:
