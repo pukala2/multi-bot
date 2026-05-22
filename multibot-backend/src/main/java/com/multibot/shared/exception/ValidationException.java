@@ -1,6 +1,6 @@
 package com.multibot.shared.exception;
 
-public final class ValidationException extends DomainException {
+public non-sealed class ValidationException extends DomainException {
 
     public ValidationException(String message) {
         super(message);

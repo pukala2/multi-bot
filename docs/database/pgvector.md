@@ -51,7 +51,7 @@ services:
 
 ### Migracja Flyway
 
-`V20250522_0001__create_extension_pgvector.sql`:
+`V20260522_0001__create_extension_pgvector.sql`:
 ```sql
 CREATE EXTENSION IF NOT EXISTS vector;
 ```
@@ -173,7 +173,7 @@ Powody:
 ### Deklaracja indexu
 
 ```sql
--- W migracji V20250522_0601__create_chunks_hnsw_index.sql
+-- W migracji V20260522_0601__create_chunks_hnsw_index.sql
 CREATE INDEX idx_chunks_embedding 
 ON chunks 
 USING HNSW (embedding vector_cosine_ops);

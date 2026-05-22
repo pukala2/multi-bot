@@ -87,27 +87,27 @@ Każda tabela ma audit columns:
 ```
 multibot-backend/src/main/resources/db/migration/
 ├── common/
-│   └── V20250522_0001__create_extension_pgvector.sql
-│   └── V20250522_0002__create_extension_uuid.sql
+│   └── V20260522_0001__create_extension_pgvector.sql
+│   └── V20260522_0002__create_extension_uuid.sql
 ├── tenant/
-│   └── V20250522_0100__create_tenants.sql
-│   └── V20250522_0101__seed_default_tenant.sql
+│   └── V20260522_0100__create_tenants.sql
+│   └── V20260522_0101__seed_default_tenant.sql
 ├── user/
-│   └── V20250522_0200__create_users.sql
+│   └── V20260522_0200__create_users.sql
 ├── file/
-│   └── V20250522_0300__create_stored_files.sql
+│   └── V20260522_0300__create_stored_files.sql
 ├── document/
-│   └── V20250522_0400__create_documents.sql
+│   └── V20260522_0400__create_documents.sql
 ├── indexing/
-│   └── V20250522_0500__create_indexing_jobs.sql
+│   └── V20260522_0500__create_indexing_jobs.sql
 ├── vector/
-│   └── V20250522_0600__create_chunks.sql
-│   └── V20250522_0601__create_chunks_hnsw_index.sql
+│   └── V20260522_0600__create_chunks.sql
+│   └── V20260522_0601__create_chunks_hnsw_index.sql
 ├── chat/
-│   └── V20250522_0700__create_chat_sessions.sql
-│   └── V20250522_0701__create_messages.sql
+│   └── V20260522_0700__create_chat_sessions.sql
+│   └── V20260522_0701__create_messages.sql
 └── modulith/
-    └── V20250522_0800__create_event_publication.sql
+    └── V20260522_0800__create_event_publication.sql
 ```
 
 W `application.yml`:
@@ -151,7 +151,7 @@ spring:
 Pełne szczegóły indeksów, wymiarów, strategii similarity → [`pgvector.md`](pgvector.md).
 
 W skrócie:
-- Migracja `V20250522_0001__create_extension_pgvector.sql`: `CREATE EXTENSION IF NOT EXISTS vector;`
+- Migracja `V20260522_0001__create_extension_pgvector.sql`: `CREATE EXTENSION IF NOT EXISTS vector;`
 - Wymiar embeddingów: `1536` (OpenAI `text-embedding-3-small`)
 - Distance: cosine (`<=>` operator)
 - Index na `chunks.embedding`: HNSW (parametry → `pgvector.md`)
@@ -444,7 +444,7 @@ Pokazuje pełen schemat z kolorystyką:
 
 ## 9. Seed data
 
-Migracja `V20250522_0101__seed_default_tenant.sql`:
+Migracja `V20260522_0101__seed_default_tenant.sql`:
 
 ```sql
 -- Default tenant dla MVP (tenant_id=1 hardcoded w aplikacji)

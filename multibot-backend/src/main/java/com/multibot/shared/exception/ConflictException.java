@@ -1,6 +1,6 @@
 package com.multibot.shared.exception;
 
-public final class ConflictException extends DomainException {
+public non-sealed class ConflictException extends DomainException {
 
     public ConflictException(String message) {
         super(message);

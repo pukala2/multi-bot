@@ -5,6 +5,16 @@ spring:
     openai:
       api-key: test-openai-key
 
+management:
+  endpoint:
+    health:
+      show-details: always
+  health:
+    livenessstate:
+      enabled: true
+    readinessstate:
+      enabled: true
+
 multibot:
   tenancy:
     mode: mock
