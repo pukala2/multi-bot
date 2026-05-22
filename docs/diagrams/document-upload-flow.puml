@@ -1,0 +1,152 @@
+@startuml document-upload-flow
+title Document Upload + Indexing Flow
+
+skinparam sequenceMessageAlign center
+skinparam ParticipantPadding 10
+skinparam BoxPadding 10
+
+actor "Admin" as admin
+participant "DocumentController\n(document/api)" as ctrl
+participant "DocumentService\n(document/application)" as docSvc
+participant "FileService\n(file/application)" as fileSvc
+participant "DocumentRepository\n(infrastructure)" as docRepo
+participant "ApplicationEventPublisher\n(Spring Modulith)" as events
+database "PostgreSQL" as db
+
+== Phase 1: Synchroniczny upload (request HTTP) ==
+
+admin -> ctrl : POST /api/documents\n(multipart: file, filename)
+activate ctrl
+
+ctrl -> ctrl : @Valid - walidacja DTO\n(filename, file present, mime type)
+
+ctrl -> docSvc : uploadDocument(UploadDocumentCommand)
+activate docSvc
+
+note over docSvc
+  Transakcja zaczyna się tutaj
+  (@Transactional)
+end note
+
+docSvc -> fileSvc : storeFile(bytes, mimeType, filename)
+activate fileSvc
+
+fileSvc -> fileSvc : zapis na dysku\n(./storage/tenants/{tenantId}/{uuid}.ext)
+fileSvc -> db : INSERT INTO stored_files\n(tenant_id, original_filename, ...)
+fileSvc --> docSvc : StoredFileId
+
+deactivate fileSvc
+
+docSvc -> docRepo : save(Document(status=PENDING,\n  storedFileId=..., uploadedAt=now))
+activate docRepo
+docRepo -> db : INSERT INTO documents (...)
+docRepo --> docSvc : Document
+deactivate docRepo
+
+docSvc -> events : publishEvent(\n  DocumentUploadedEvent(\n    documentId, tenantId, ...))
+note right of events
+  Modulith zapisuje event
+  do tabeli event_publication
+  w tej samej transakcji
+end note
+events -> db : INSERT INTO event_publication\n(listener_id, event_type, payload)
+
+docSvc --> ctrl : Document
+deactivate docSvc
+
+note over docSvc, db
+  COMMIT transakcji.
+  Po commicie Modulith uruchamia worker.
+end note
+
+ctrl --> admin : 202 Accepted\nDocumentResponse(status=PENDING)\nLocation: /api/documents/{id}
+deactivate ctrl
+
+== Phase 2: Asynchroniczna indeksacja (Spring Modulith) ==
+
+participant "IndexingEventListener\n(indexing/application)" as listener
+participant "IndexingService\n(indexing/application)" as idxSvc
+participant "FileReader\n(file/.../ReadFileUseCase)" as fileReader
+participant "Tika\n(infrastructure)" as tika
+participant "TokenTextSplitter\n(ai/Spring AI)" as splitter
+participant "EmbeddingModel\n(ai/Spring AI)" as embed
+participant "OpenAI API" as openai #lightgrey
+participant "VectorService\n(vector/application)" as vector
+
+events -> listener : @ApplicationModuleListener\n(po commicie phase 1)
+activate listener
+
+note over listener
+  TenantContext ustawiony
+  automatycznie z eventu
+end note
+
+listener -> idxSvc : indexDocument(documentId)
+activate idxSvc
+
+idxSvc -> idxSvc : **Idempotency check**\n- Document.status == READY? SKIP\n- Cleanup poprzedniej próby:\n  - delete chunks WHERE document_id=?\n  - delete indexing_jobs WHERE document_id=?
+
+idxSvc -> db : UPDATE documents\nSET status='PROCESSING'\nWHERE id=? AND status='PENDING'
+
+idxSvc -> db : INSERT INTO indexing_jobs\n(status='RUNNING', started_at=now)
+
+idxSvc -> fileReader : readFile(storedFileId)
+activate fileReader
+fileReader -> fileReader : czyta z dysku
+fileReader --> idxSvc : byte[]
+deactivate fileReader
+
+idxSvc -> tika : extract(bytes, mimeType)
+activate tika
+tika --> idxSvc : ExtractedText\n(content, pageCount, lang)
+deactivate tika
+
+idxSvc -> splitter : split(text, chunkSize=500)
+activate splitter
+splitter --> idxSvc : List<String>\n(N chunków)
+deactivate splitter
+
+loop dla każdego chunka
+    idxSvc -> embed : embed(chunkContent)
+    activate embed
+    embed -> openai : POST /v1/embeddings
+    openai --> embed : float[1536]
+    embed --> idxSvc : Embedding
+    deactivate embed
+end
+
+idxSvc -> vector : storeAll(List<Chunk>)
+activate vector
+vector -> vector : ustawia tenant_id\nz TenantContext
+vector -> db : INSERT INTO chunks\n(tenant_id, document_id, content,\n embedding, metadata)
+deactivate vector
+
+idxSvc -> db : UPDATE indexing_jobs\nSET status='COMPLETED',\n    completed_at=now,\n    chunks_created=N
+
+idxSvc -> events : publishEvent(\n  IndexingCompletedEvent(\n    documentId, chunksCreated))
+
+idxSvc --> listener : void
+deactivate idxSvc
+
+listener --> events : completion_date = NOW()
+deactivate listener
+
+== Phase 3: Update statusu dokumentu (Spring Modulith) ==
+
+participant "DocumentStatusUpdater\n(document/application)" as updater
+
+events -> updater : @ApplicationModuleListener\n(IndexingCompletedEvent)
+activate updater
+
+updater -> db : UPDATE documents\nSET status='READY',\n    indexed_at=now\nWHERE id=? AND status='PROCESSING'
+
+updater --> events : completion_date = NOW()
+deactivate updater
+
+note over admin, db
+  Klient może teraz pollować
+  GET /api/documents/{id}/status
+  i dostanie status=READY.
+end note
+
+@enduml

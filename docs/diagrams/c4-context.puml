@@ -1,0 +1,23 @@
+@startuml c4-context
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Context.puml
+
+title Multibot - Diagram kontekstowy (C4 Level 1)
+
+Person(admin, "Admin firmy", "Pracownik Tenanta. Zarządza dokumentami, ogląda historię rozmów i statystyki w panelu.")
+Person(enduser, "End user", "Klient firmy-Tenanta. Rozmawia z chatbotem osadzonym na stronie Tenanta lub na hosted page.")
+
+System(multibot, "Multibot Platform", "SaaS B2B do zarządzania chatbotami AI z RAG. Multi-tenant - każdy Tenant ma swojego bota z własnymi dokumentami.")
+
+System_Ext(anthropic, "Anthropic API", "LLM Claude (Haiku / Sonnet). Generuje odpowiedzi bota na podstawie kontekstu RAG.")
+System_Ext(openai, "OpenAI API", "Generuje embeddingi dokumentów i pytań (text-embedding-3-small).")
+System_Ext(storage, "File Storage", "Przechowuje surowe pliki wgrane przez Adminów. MVP: dysk lokalny. Produkcja: S3 / Hetzner Storage Box.")
+
+Rel(admin, multibot, "Loguje się do panelu, uploaduje pliki, ogląda statystyki", "HTTPS")
+Rel(enduser, multibot, "Zadaje pytania chatbotowi", "HTTPS + SSE")
+
+Rel(multibot, anthropic, "Wywołuje LLM ze streamingiem", "HTTPS")
+Rel(multibot, openai, "Generuje embeddingi", "HTTPS")
+Rel(multibot, storage, "Zapisuje i czyta pliki", "FS / S3 API")
+
+SHOW_LEGEND()
+@enduml

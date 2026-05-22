@@ -1,0 +1,143 @@
+@startuml chat-rag-flow
+title Chat z RAG - flow ze streaming SSE
+
+skinparam sequenceMessageAlign center
+skinparam ParticipantPadding 10
+
+actor "End user\n(widget / hosted page)" as user
+participant "ChatController\n(chat/api)" as ctrl
+participant "ChatService\n(chat/application)" as chatSvc
+participant "ChatRepository\n(infrastructure)" as chatRepo
+participant "RagService\n(rag/application)" as ragSvc
+participant "EmbeddingModel\n(ai/Spring AI)" as embed
+participant "VectorService\n(vector/application)" as vector
+participant "PromptBuilder\n(rag/application)" as prompt
+participant "ChatClient\n(ai/Spring AI)" as chat
+database "PostgreSQL\n+ pgvector" as db
+participant "OpenAI API\n(embeddings)" as openai #lightgrey
+participant "Anthropic API\n(LLM)" as anthropic #lightgrey
+
+== Phase 1: Odebranie wiadomości ==
+
+user -> ctrl : POST /api/chat/sessions/{id}/messages\n{content: "Jakie są godziny..."}
+activate ctrl
+
+ctrl -> ctrl : @Valid - walidacja DTO\n(content not blank, length OK)
+
+ctrl -> chatSvc : sendMessage(sessionId, content)
+activate chatSvc
+
+note over chatSvc
+  @Transactional dla zapisu user message
+  (krótka transakcja - bez LLM call)
+end note
+
+chatSvc -> chatRepo : findSession(sessionId)
+activate chatRepo
+chatRepo -> db : SELECT FROM chat_sessions\nWHERE id=? (tenant_id filter)
+chatRepo --> chatSvc : ChatSession
+deactivate chatRepo
+
+chatSvc -> chatRepo : saveMessage(\n  Message(role=USER, content, sessionId))
+chatRepo -> db : INSERT INTO messages
+
+chatSvc -> chatRepo : findRecentMessages(sessionId, limit=10)
+chatRepo -> db : SELECT FROM messages\nORDER BY created_at DESC LIMIT 10
+chatRepo --> chatSvc : List<Message> history
+
+note over chatSvc, db
+  COMMIT - user message zapisana,
+  historia pobrana
+end note
+
+== Phase 2: RAG + LLM streaming ==
+
+chatSvc -> ragSvc : answerQuestion(\n  RagQuery(question, history, tenantId))
+activate ragSvc
+
+ragSvc -> embed : embed(question)
+activate embed
+embed -> openai : POST /v1/embeddings
+openai --> embed : float[1536]
+embed --> ragSvc : Embedding
+deactivate embed
+
+ragSvc -> vector : search(\n  VectorSearchQuery(\n    queryEmbedding, topK=5))
+activate vector
+vector -> vector : dodaje filter:\n  tenant_id == TenantContext.get()
+vector -> db : SELECT FROM chunks\nWHERE tenant_id=?\nORDER BY embedding <=> $1\nLIMIT 50
+db --> vector : top-50 chunków
+vector -> vector : aplikacyjny filter:\n  similarity > min_score\n  top-K (5)
+vector --> ragSvc : List<VectorSearchResult>
+deactivate vector
+
+ragSvc -> prompt : build(\n  systemPrompt, history,\n  retrievedChunks, question)
+activate prompt
+prompt -> prompt : składa: system prompt PL +\n  kontekst z chunków +\n  historia rozmowy +\n  pytanie
+prompt --> ragSvc : Prompt
+deactivate prompt
+
+ragSvc -> chat : prompt(promptText).stream()
+activate chat
+chat -> anthropic : POST /v1/messages\n(streaming response)
+
+== Phase 3: SSE streaming do klienta ==
+
+note over user, anthropic
+  Od tej chwili wszystko leci jako stream.
+  Klient otrzymuje SSE eventy.
+end note
+
+ctrl --> user : 200 OK\nContent-Type: text/event-stream
+note right of ctrl
+  Headers wysłane od razu,
+  body to streaming
+end note
+
+loop dla każdego tokena/chunka z LLM
+    anthropic --> chat : token (delta)
+    chat --> ragSvc : RagAnswerChunk(textDelta)
+    ragSvc --> chatSvc : RagAnswerChunk
+    chatSvc --> ctrl : SSE chunk
+    ctrl --> user : event: chunk\ndata: {"text": "..."}
+end
+
+anthropic --> chat : [DONE]
+deactivate anthropic
+chat --> ragSvc : streaming complete
+deactivate chat
+
+ragSvc -> ragSvc : składa pełną odpowiedź ze wszystkich delta
+ragSvc -> ragSvc : buduje List<Citation>\nz retrievedChunks
+ragSvc --> chatSvc : RagAnswer\n(fullText, citations, tokensUsed)
+deactivate ragSvc
+
+chatSvc --> ctrl : sources + done event payload
+ctrl --> user : event: sources\ndata: {"sources": [...]}
+ctrl --> user : event: done\ndata: {"messageId": ..., "tokensUsed": ...}
+
+== Phase 4: Zapis assistant message + cleanup ==
+
+note over chatSvc, db
+  Nowa @Transactional
+  (po streamingu, krótka)
+end note
+
+chatSvc -> chatRepo : saveMessage(\n  Message(role=ASSISTANT,\n    content=fullText,\n    sources, tokensUsed))
+activate chatRepo
+chatRepo -> db : INSERT INTO messages
+deactivate chatRepo
+
+chatSvc -> chatRepo : updateLastActivity(sessionId, now)
+chatRepo -> db : UPDATE chat_sessions\nSET last_activity_at=now
+
+deactivate chatSvc
+
+note over user
+  Klient zamyka EventSource
+  po otrzymaniu event: done
+end note
+
+deactivate ctrl
+
+@enduml

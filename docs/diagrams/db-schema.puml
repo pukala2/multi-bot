@@ -1,0 +1,209 @@
+@startuml db-schema
+title Multibot - schemat bazy danych (ERD)
+
+skinparam linetype ortho
+skinparam roundCorner 8
+
+skinparam entity {
+    BackgroundColor<<table>> #fafafa
+    BorderColor<<table>> #707070
+    BackgroundColor<<modulith>> #e8e8ff
+    BorderColor<<modulith>> #6f42c1
+    BackgroundColor<<post_mvp>> #fff3b3
+    BorderColor<<post_mvp>> #cc9900
+}
+
+' Legenda symboli:
+'   * = NOT NULL (required)
+'   <<PK>> = primary key
+'   <<FK>> = foreign key
+'   <<U>> = unique
+'   <<V>> = vector column (pgvector)
+
+' ========== Tenant ==========
+entity tenants <<table>> {
+    * id : uuid <<PK>>
+    --
+    * name : varchar(255)
+    * slug : varchar(64) <<U>>
+    * plan : varchar(32)
+    * status : varchar(32)
+    --
+    * created_at : timestamptz
+    * updated_at : timestamptz
+      created_by : uuid
+      updated_by : uuid
+}
+
+' ========== Users (post-MVP) ==========
+entity users <<post_mvp>> {
+    * id : uuid <<PK>>
+    --
+    * tenant_id : uuid <<FK>>
+    * email : varchar(320)
+    * password_hash : varchar(255)
+    * role : varchar(32)
+    --
+    * created_at : timestamptz
+    * updated_at : timestamptz
+      created_by : uuid
+      updated_by : uuid
+    --
+    unique(tenant_id, email)
+}
+
+' ========== Stored files ==========
+entity stored_files <<table>> {
+    * id : uuid <<PK>>
+    --
+    * tenant_id : uuid <<FK>>
+    * original_filename : varchar(512)
+    * mime_type : varchar(128)
+    * size_bytes : bigint
+    * storage_key : varchar(1024)
+    --
+    * created_at : timestamptz
+      created_by : uuid
+}
+
+' ========== Documents ==========
+entity documents <<table>> {
+    * id : uuid <<PK>>
+    --
+    * tenant_id : uuid <<FK>>
+    * stored_file_id : uuid <<FK>>
+    * filename : varchar(512)
+    * mime_type : varchar(128)
+    * size_bytes : bigint
+    * status : varchar(32)
+    * uploaded_at : timestamptz
+      indexed_at : timestamptz
+    --
+    * created_at : timestamptz
+    * updated_at : timestamptz
+      created_by : uuid
+      updated_by : uuid
+}
+
+' ========== Indexing jobs ==========
+entity indexing_jobs <<table>> {
+    * id : uuid <<PK>>
+    --
+    * tenant_id : uuid <<FK>>
+    * document_id : uuid <<FK>>
+    * status : varchar(32)
+      error_message : text
+      chunks_created : int
+    * started_at : timestamptz
+      completed_at : timestamptz
+    --
+    * created_at : timestamptz
+    * updated_at : timestamptz
+}
+
+' ========== Chunks (pgvector) ==========
+entity chunks <<table>> {
+    * id : uuid <<PK>>
+    --
+    * tenant_id : uuid <<FK>>
+    * document_id : uuid <<FK>>
+    * chunk_index : int
+    * content : text
+    * embedding : vector(1536) <<V>>
+      metadata : jsonb
+    --
+    * created_at : timestamptz
+    --
+    unique(document_id, chunk_index)
+}
+
+' ========== Chat sessions ==========
+entity chat_sessions <<table>> {
+    * id : uuid <<PK>>
+    --
+    * tenant_id : uuid <<FK>>
+      end_user_external_id : varchar(255)
+    * anonymous_id : varchar(255)
+    * started_at : timestamptz
+    * last_activity_at : timestamptz
+      metadata : jsonb
+    --
+    * created_at : timestamptz
+    * updated_at : timestamptz
+}
+
+' ========== Messages ==========
+entity messages <<table>> {
+    * id : uuid <<PK>>
+    --
+    * tenant_id : uuid <<FK>>
+    * session_id : uuid <<FK>>
+    * role : varchar(16)
+    * content : text
+      sources : jsonb
+      tokens_used : int
+    --
+    * created_at : timestamptz
+}
+
+' ========== Spring Modulith ==========
+entity event_publication <<modulith>> {
+    * id : uuid <<PK>>
+    --
+    * listener_id : varchar(512)
+    * event_type : varchar(512)
+    * serialized_event : varchar
+    * publication_date : timestamptz
+      completion_date : timestamptz
+}
+
+' ========== Relations ==========
+tenants ||--o{ users : "RESTRICT"
+tenants ||--o{ stored_files : "RESTRICT"
+tenants ||--o{ documents : "RESTRICT"
+tenants ||--o{ indexing_jobs : "RESTRICT"
+tenants ||--o{ chunks : "RESTRICT"
+tenants ||--o{ chat_sessions : "RESTRICT"
+tenants ||--o{ messages : "RESTRICT"
+
+stored_files ||--|| documents : "RESTRICT"
+documents ||--o{ chunks : "CASCADE"
+documents ||--o{ indexing_jobs : "CASCADE"
+chat_sessions ||--o{ messages : "CASCADE"
+
+' ========== Notes ==========
+note bottom of tenants
+  Default tenant w MVP:
+  id = 00000000-0000-7000-8000-000000000001
+  slug = 'default'
+end note
+
+note bottom of chunks
+  embedding: VECTOR(1536) - pgvector
+  HNSW index z cosine distance.
+  Szczegóły w pgvector.md
+end note
+
+note right of event_publication
+  Spring Modulith outbox.
+  Brak FK do innych tabel - tenant_id
+  zapisany w serialized_event JSON.
+end note
+
+note as Legend
+  **Legenda**
+  ----
+  <#fafafa>**MVP table**</#fafafa>
+  <#fff3b3>**post-MVP table**</#fff3b3>
+  <#e8e8ff>**Spring Modulith**</#e8e8ff>
+  ----
+  * = NOT NULL
+  <<PK>> = primary key
+  <<FK>> = foreign key
+  <<U>> = unique
+  <<V>> = pgvector column
+  ----
+  RESTRICT / CASCADE = ON DELETE behavior
+end note
+
+@enduml

@@ -1,0 +1,96 @@
+@startuml backend-hexagonal-module
+title Wzorzec hexagonalny w pojedynczym module (przykład: document)
+
+skinparam componentStyle rectangle
+skinparam packageStyle rectangle
+skinparam component {
+    BackgroundColor<<domain>> #fff3b3
+    BorderColor<<domain>> #cc9900
+    BackgroundColor<<application>> #b3d7ff
+    BorderColor<<application>> #0066cc
+    BackgroundColor<<infrastructure>> #d4edda
+    BorderColor<<infrastructure>> #28a745
+    BackgroundColor<<api>> #ffcccc
+    BorderColor<<api>> #cc0000
+    BackgroundColor<<external>> #e0e0e0
+    BorderColor<<external>> #707070
+}
+
+actor "Klient HTTP" as client #lightblue
+component "REST Controller\n(api)" as ctrl <<api>>
+component "DTOs + Mappery API" as apidto <<api>>
+
+package "domain (pure)" {
+    component "Document\n(model)" as model <<domain>>
+    component "port.in:\nUploadDocumentUseCase\nDeleteDocumentUseCase\nListDocumentsUseCase" as portin <<domain>>
+    component "port.out:\nDocumentRepository\n(interface)" as portout <<domain>>
+}
+
+component "DocumentService\n(application)" as svc <<application>>
+
+package "infrastructure" {
+    component "DocumentJpaEntity\n+ Mapper" as jpa <<infrastructure>>
+    component "DocumentRepositoryAdapter\nimplements DocumentRepository" as repoadapt <<infrastructure>>
+    component "Spring Data JPA\nrepository" as springdata <<infrastructure>>
+}
+
+database "PostgreSQL" as db <<external>>
+component "[file] module\n(StoreFileUseCase)" as filemod <<external>>
+
+' API flow
+client -down-> ctrl : "HTTP POST /api/documents"
+ctrl -down-> apidto : "validate input"
+ctrl -down-> portin : "calls UploadDocumentUseCase"
+
+' Use case implementation
+portin <|.. svc : "implements"
+svc -down-> model : "tworzy Document"
+svc -down-> portout : "save(document)"
+svc -right-> filemod : "saves file bytes"
+
+' Adapter implementation
+portout <|.. repoadapt : "implements"
+repoadapt -down-> jpa : "Document ↔ DocumentJpaEntity\n(mapper)"
+repoadapt -down-> springdata : "delegates"
+springdata -down-> db : "SQL + @TenantId filter"
+
+' Layering rules
+note right of model
+  PURE domain:
+  - zero importów spoza domain/
+  - bez @Entity, bez @Id
+  - bez Spring, bez Hibernate
+  - tylko Java records / POJO
+end note
+
+note right of svc
+  application:
+  - implementuje port.in
+  - orchestracja
+  - transakcje (@Transactional)
+  - woła porty wyjściowe
+end note
+
+note left of repoadapt
+  infrastructure:
+  - implementuje porty wyjściowe
+  - frameworki (Spring, JPA, S3 SDK)
+  - mapuje domain ↔ JPA entity
+end note
+
+legend right
+    | Kolor | Warstwa |
+    |<#ffcccc>| api - REST adapter (wejściowy) |
+    |<#fff3b3>| domain - czysta domena (porty + model) |
+    |<#b3d7ff>| application - use case'y |
+    |<#d4edda>| infrastructure - adaptery (DB, S3, etc.) |
+    |<#e0e0e0>| external - inne moduły / systemy |
+
+    Reguły zależności:
+    domain → nic (zero importów spoza)
+    application → tylko domain
+    infrastructure → domain + frameworki
+    api → domain.port.in + domain.model
+end legend
+
+@enduml

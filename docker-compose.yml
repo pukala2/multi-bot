@@ -1,0 +1,21 @@
+services:
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: multibot-postgres
+    environment:
+      POSTGRES_DB: multibot
+      POSTGRES_USER: multibot
+      POSTGRES_PASSWORD: multibot
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U multibot -d multibot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  pgdata:

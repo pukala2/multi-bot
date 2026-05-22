@@ -1,0 +1,63 @@
+@startuml mvp-scope
+title Multibot - Zakres MVP vs Post-MVP
+
+skinparam defaultTextAlignment center
+skinparam roundCorner 10
+
+skinparam rectangle {
+    BackgroundColor<<mvp>> #d4edda
+    BorderColor<<mvp>> #28a745
+    BackgroundColor<<later>> #f8d7da
+    BorderColor<<later>> #dc3545
+    BackgroundColor<<header>> #ffffff
+    BorderColor<<header>> #ffffff
+    FontStyle<<header>> bold
+    FontSize<<header>> 16
+}
+
+rectangle "✅  W MVP - budujemy" <<header>> as mvp_header
+rectangle "⏳  Post-MVP - odpuszczamy" <<header>> as later_header
+
+rectangle "Backend Spring Boot\nz RAG (Spring AI)" <<mvp>> as m1
+rectangle "Frontend panel admina\n(React + shadcn/ui)" <<mvp>> as m2
+rectangle "Upload + async\nindeksacja dokumentów" <<mvp>> as m3
+rectangle "Chat z RAG\nze streamingiem (SSE)" <<mvp>> as m4
+rectangle "Cytowanie źródeł\nw odpowiedziach" <<mvp>> as m5
+rectangle "Hosted chat page\n/chat/{tenant-slug}" <<mvp>> as m6
+rectangle "Pamięć kontekstu\nrozmowy (per session)" <<mvp>> as m7
+rectangle "Single-tenant\n(tenant_id=1 hardcoded)" <<mvp>> as m8
+rectangle "PostgreSQL + pgvector\nlokalnie przez docker-compose" <<mvp>> as m9
+
+rectangle "Widget JS embed\n(<script> na stronie klienta)" <<later>> as l1
+rectangle "Auth - login/register/JWT\nSpring Security" <<later>> as l2
+rectangle "Pełny multi-tenant\n(realne tenant_id z JWT)" <<later>> as l3
+rectangle "Billing i plany\nsubskrypcyjne" <<later>> as l4
+rectangle "White-label\n(custom branding/domain)" <<later>> as l5
+rectangle "Integracje\nSlack, Teams, Messenger" <<later>> as l6
+rectangle "S3 storage\n+ deploy produkcyjny" <<later>> as l7
+rectangle "Zaawansowany RAG\n(reranker, hybrid search)" <<later>> as l8
+rectangle "Statystyki i analityka\nzaawansowana" <<later>> as l9
+
+mvp_header -[hidden]down- m1
+m1 -[hidden]down- m2
+m2 -[hidden]down- m3
+m3 -[hidden]down- m4
+m4 -[hidden]down- m5
+m5 -[hidden]down- m6
+m6 -[hidden]down- m7
+m7 -[hidden]down- m8
+m8 -[hidden]down- m9
+
+later_header -[hidden]down- l1
+l1 -[hidden]down- l2
+l2 -[hidden]down- l3
+l3 -[hidden]down- l4
+l4 -[hidden]down- l5
+l5 -[hidden]down- l6
+l6 -[hidden]down- l7
+l7 -[hidden]down- l8
+l8 -[hidden]down- l9
+
+mvp_header -[hidden]right- later_header
+
+@enduml

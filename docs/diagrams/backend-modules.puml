@@ -1,0 +1,76 @@
+@startuml backend-modules
+title Multibot - Graf zależności modułów
+
+skinparam componentStyle rectangle
+skinparam component {
+    BackgroundColor<<infra>> #e0e0e0
+    BorderColor<<infra>> #707070
+    BackgroundColor<<crosscut>> #d6b3ff
+    BorderColor<<crosscut>> #6f42c1
+    BackgroundColor<<business>> #b3d7ff
+    BorderColor<<business>> #0066cc
+    BackgroundColor<<orchestrator>> #fff3b3
+    BorderColor<<orchestrator>> #cc9900
+    BackgroundColor<<api>> #b3ffb3
+    BorderColor<<api>> #28a745
+}
+
+package "shared kernel" <<infra>> {
+    [shared] as shared
+}
+
+package "cross-cutting infrastructure" <<crosscut>> {
+    [tenancy] as tenancy
+    [config] as config
+    [ai] as ai
+}
+
+package "business modules" <<business>> {
+    [tenant] as tenant
+    [user] as user
+    [file] as file
+    [vector] as vector
+    [document] as document
+    [chat] as chat
+}
+
+package "orchestrator modules" <<orchestrator>> {
+    [indexing] as indexing
+    [rag] as rag
+}
+
+' wszyscy zależą od shared i tenancy (linie zbyt głośne, pomijam dla czytelności)
+note left of shared
+  shared, tenancy, config - używane przez wszystkich
+  (linie pominięte dla czytelności)
+end note
+
+' Business modules
+document --> file : "StoreFileUseCase\nReadFileUseCase"
+document ..> indexing : "publishes\nDocumentUploaded event"
+
+indexing --> file : "ReadFileUseCase"
+indexing --> ai : "Spring AI\nEmbeddingModel"
+indexing --> vector : "StoreChunkUseCase"
+indexing ..> document : "publishes\nIndexingCompleted event"
+
+chat --> rag : "AnswerQuestionUseCase"
+
+rag --> vector : "SearchChunksUseCase"
+rag --> ai : "Spring AI\nChatClient"
+
+' user - post-MVP
+user -[hidden]- tenant
+
+legend right
+    | Kolor | Typ modułu |
+    |<#e0e0e0>| shared kernel |
+    |<#d6b3ff>| cross-cutting infrastructure |
+    |<#b3d7ff>| business module (wystawia API REST) |
+    |<#fff3b3>| orchestrator (bez API, wołany wewnętrznie) |
+
+    Linie ciągłe = zależność przez port IN
+    Linie kropkowane = event (Spring Modulith)
+end legend
+
+@enduml

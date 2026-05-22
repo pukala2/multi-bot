@@ -1,0 +1,66 @@
+@startuml request-with-tenant-context
+title Lifecycle requestu z TenantContext
+
+skinparam sequenceMessageAlign center
+
+actor "Klient HTTP\n(Panel / Widget)" as client
+participant "TenantFilter\n(Servlet Filter)" as filter
+participant "Controller" as ctrl
+participant "Service" as svc
+participant "Repository\n(Spring Data JPA)" as repo
+participant "Hibernate\n+ TenantIdResolver" as hib
+database "PostgreSQL" as db
+participant "TenantContext\n(ThreadLocal)" as ctx
+
+client -> filter : HTTP request\n(Authorization: Bearer <jwt>)
+activate filter
+
+note right of filter
+  MVP: ignoruje JWT,
+  ustawia tenant_id = 1
+end note
+
+filter -> ctx : set(tenantId)
+activate ctx
+
+filter -> ctrl : doFilter()
+activate ctrl
+
+ctrl -> svc : business call
+activate svc
+
+svc -> repo : findById(documentId)
+activate repo
+
+repo -> hib : query
+activate hib
+
+hib -> ctx : getCurrentTenantId()
+ctx --> hib : tenantId
+hib -> db : SELECT ... WHERE id=? AND tenant_id=?
+db --> hib : row
+hib --> repo : Document
+deactivate hib
+
+repo --> svc : Document
+deactivate repo
+
+note over svc
+  Belt-and-suspenders:
+  svc weryfikuje
+  document.tenantId == ctx.get()
+end note
+
+svc --> ctrl : DTO
+deactivate svc
+
+ctrl --> filter : ResponseEntity
+deactivate ctrl
+
+filter -> ctx : clear()
+deactivate ctx
+
+filter --> client : HTTP response
+deactivate filter
+
+@enduml

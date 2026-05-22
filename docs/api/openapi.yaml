@@ -1,0 +1,905 @@
+openapi: 3.1.0
+
+info:
+  title: Multibot API
+  version: 1.0.0
+  description: |
+    REST API platformy Multibot - SaaS B2B do zarządzania chatbotami AI z RAG.
+
+    Dokumentacja human-readable: `endpoints.md`.
+  contact:
+    name: Multibot Team
+
+servers:
+  - url: http://localhost:8080
+    description: Local development
+  - url: https://api.multibot.app
+    description: Production (post-MVP)
+
+tags:
+  - name: Documents
+    description: Upload, listowanie, usuwanie dokumentów + monitorowanie statusu indeksacji.
+  - name: Chat
+    description: Sesje chatu, historia wiadomości, wysyłanie wiadomości z SSE streamingiem.
+
+# ============================================================
+# PATHS
+# ============================================================
+paths:
+
+  # ----- Documents -----
+
+  /api/documents:
+
+    get:
+      tags: [Documents]
+      operationId: listDocuments
+      summary: Lista dokumentów tenanta
+      description: Zwraca paginowaną listę dokumentów z możliwością sortowania.
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+      responses:
+        '200':
+          description: Lista dokumentów
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedDocumentResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags: [Documents]
+      operationId: uploadDocument
+      summary: Upload nowego dokumentu
+      description: |
+        Upload pliku PDF/DOCX/TXT/MD. Po zapisie wyzwala asynchroniczną indeksację.
+        Response zawiera dokument ze statusem `PENDING`. Klient może pollować
+        `GET /api/documents/{id}/status` lub polegać na finalnym statusie `READY`.
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Plik dokumentu (max 50MB)
+                filename:
+                  type: string
+                  description: Opcjonalna nazwa pliku (jeśli inna niż oryginalna)
+                  example: "OWU 2025 - PZU.pdf"
+              required: [file]
+      responses:
+        '202':
+          description: Dokument przyjęty, indeksacja w tle
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+          headers:
+            Location:
+              schema:
+                type: string
+              description: URL nowego dokumentu
+              example: "/api/documents/01918a3f-9c1e-7c40-8000-000000000001"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '413':
+          $ref: '#/components/responses/PayloadTooLarge'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/documents/{id}:
+
+    get:
+      tags: [Documents]
+      operationId: getDocument
+      summary: Pobierz dokument
+      description: Pełne metadane dokumentu (bez zawartości pliku).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Dokument
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    delete:
+      tags: [Documents]
+      operationId: deleteDocument
+      summary: Usuń dokument
+      description: |
+        Kaskadowe usunięcie: dokument + chunki w pgvector + plik z storage.
+        Operacja synchroniczna - po response zasób nie istnieje.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Dokument usunięty
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/documents/{id}/status:
+
+    get:
+      tags: [Documents]
+      operationId: getDocumentStatus
+      summary: Lekki endpoint statusu (dla pollowania z FE)
+      description: |
+        Zwraca tylko status i timestamps. Zoptymalizowany do częstego pollowania
+        z frontendu w trakcie indeksacji.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Status dokumentu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DocumentStatusResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  # ----- Chat -----
+
+  /api/chat/sessions:
+
+    get:
+      tags: [Chat]
+      operationId: listChatSessions
+      summary: Lista sesji chatu tenanta
+      description: |
+        Paginowana lista sesji. Dla admina - pozwala przeglądać historię rozmów.
+        Sortowanie domyślne: `lastActivityAt,desc`.
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+      responses:
+        '200':
+          description: Lista sesji
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedChatSessionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags: [Chat]
+      operationId: startChatSession
+      summary: Utworzenie nowej sesji chatu
+      description: |
+        Tworzy nową sesję dla end usera. End user jest anonymous (zawsze `anonymousId`),
+        opcjonalnie z `externalId` (jeśli klient identyfikuje swoich userów).
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartSessionRequest'
+      responses:
+        '201':
+          description: Sesja utworzona
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatSessionResponse'
+          headers:
+            Location:
+              schema:
+                type: string
+              description: URL nowej sesji
+              example: "/api/chat/sessions/01918a3f-9c1e-7c40-8000-000000000001"
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/chat/sessions/{id}/messages:
+
+    get:
+      tags: [Chat]
+      operationId: getSessionHistory
+      summary: Historia wiadomości w sesji
+      description: |
+        Paginowana lista wiadomości w sesji.
+        Sortowanie domyślne: `createdAt,asc` (kolejność chronologiczna).
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/SizeParam'
+        - $ref: '#/components/parameters/SortParam'
+      responses:
+        '200':
+          description: Historia wiadomości
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PaginatedMessageResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+    post:
+      tags: [Chat]
+      operationId: sendMessage
+      summary: Wyślij wiadomość - response w formie SSE stream
+      description: |
+        Endpoint wysyłający wiadomość użytkownika i zwracający odpowiedź bota
+        w formie **Server-Sent Events (SSE)** streamu.
+
+        Format strumienia:
+        ```
+        event: chunk
+        data: {"text": "część odpowiedzi..."}
+
+        event: chunk
+        data: {"text": "kolejna część..."}
+
+        event: sources
+        data: {"sources": [{"chunkId": "...", "documentId": "...", "snippet": "...", "score": 0.85}]}
+
+        event: done
+        data: {"messageId": "uuid", "tokensUsed": 1234}
+        ```
+
+        Typy eventów:
+        - `chunk` - kolejny fragment tekstu odpowiedzi (delta)
+        - `sources` - lista cytatów z dokumentów źródłowych (emitowane na końcu, przed `done`)
+        - `done` - koniec strumienia, finalne ID wiadomości i statystyki
+
+        Klient powinien parsować SSE używając EventSource API (browser) lub
+        odpowiedniego klienta SSE.
+
+        Schemy event payloadów: zobacz `MessageChunkEvent`, `MessageSourcesEvent`, `MessageDoneEvent`.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SendMessageRequest'
+      responses:
+        '200':
+          description: SSE stream odpowiedzi bota
+          content:
+            text/event-stream:
+              schema:
+                type: string
+                description: |
+                  Server-Sent Events stream. Każdy event ma format:
+                  ```
+                  event: <type>
+                  data: <JSON payload>
+                  ```
+                  gdzie type to `chunk`, `sources` lub `done`.
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+# ============================================================
+# COMPONENTS
+# ============================================================
+components:
+
+  # ----- Schemas -----
+  schemas:
+
+    # === Shared (common) ===
+
+    ProblemDetail:
+      type: object
+      description: |
+        RFC 7807 Problem Details - jednolity format błędów dla wszystkich response'ów 4xx i 5xx.
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI identyfikujący typ problemu
+          example: "https://multibot.app/errors/document-not-found"
+        title:
+          type: string
+          description: Krótki, human-readable tytuł problemu
+          example: "Document Not Found"
+        status:
+          type: integer
+          description: HTTP status code
+          example: 404
+        detail:
+          type: string
+          description: Szczegóły specyficzne dla tego wystąpienia
+          example: "Document with id 01918a3f-9c1e-7c40-8000-000000000001 not found"
+        instance:
+          type: string
+          description: URI ścieżki która zwróciła błąd
+          example: "/api/documents/01918a3f-9c1e-7c40-8000-000000000001"
+        code:
+          type: string
+          description: Machine-readable kod błędu
+          example: "DOCUMENT_NOT_FOUND"
+        tenantId:
+          type: string
+          format: uuid
+          description: ID tenanta requestu (do debugowania)
+        traceId:
+          type: string
+          description: ID trace dla distributed tracing
+        timestamp:
+          type: string
+          format: date-time
+          description: Czas wystąpienia błędu (ISO 8601)
+      required:
+        - type
+        - title
+        - status
+
+    ValidationErrorDetail:
+      type: object
+      description: Pojedynczy błąd walidacji pola
+      properties:
+        field:
+          type: string
+          example: "filename"
+        message:
+          type: string
+          example: "must not be blank"
+        rejectedValue:
+          description: Wartość która została odrzucona (jeśli safe to log)
+          example: ""
+      required:
+        - field
+        - message
+
+    ValidationProblemDetail:
+      description: ProblemDetail rozszerzony o listę błędów walidacji (response 400)
+      allOf:
+        - $ref: '#/components/schemas/ProblemDetail'
+        - type: object
+          properties:
+            errors:
+              type: array
+              items:
+                $ref: '#/components/schemas/ValidationErrorDetail'
+          required:
+            - errors
+
+    IdResponse:
+      type: object
+      description: Response zawierający tylko ID utworzonego zasobu
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "01918a3f-9c1e-7c40-8000-000000000001"
+      required:
+        - id
+
+    PageMetadata:
+      type: object
+      description: Metadane paginacji w response
+      properties:
+        page:
+          type: integer
+          description: Numer aktualnej strony (0-based)
+          example: 0
+        size:
+          type: integer
+          description: Rozmiar strony
+          example: 20
+        totalElements:
+          type: integer
+          format: int64
+          description: Całkowita liczba elementów
+          example: 42
+        totalPages:
+          type: integer
+          description: Całkowita liczba stron
+          example: 3
+        first:
+          type: boolean
+          description: Czy to pierwsza strona
+        last:
+          type: boolean
+          description: Czy to ostatnia strona
+      required:
+        - page
+        - size
+        - totalElements
+        - totalPages
+        - first
+        - last
+
+    # === Documents ===
+
+    DocumentStatus:
+      type: string
+      enum: [PENDING, PROCESSING, READY, FAILED]
+      description: |
+        Stan indeksacji dokumentu:
+        - PENDING: właśnie uploadowany, czeka na indeksację
+        - PROCESSING: indeksacja w toku
+        - READY: zaindeksowany, gotowy do RAG
+        - FAILED: indeksacja nie powiodła się
+
+    DocumentResponse:
+      type: object
+      description: Pełne metadane dokumentu
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: "01918a3f-9c1e-7c40-8000-000000000001"
+        filename:
+          type: string
+          example: "owu-pzu-2025.pdf"
+        mimeType:
+          type: string
+          example: "application/pdf"
+        sizeBytes:
+          type: integer
+          format: int64
+          example: 2048576
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+        uploadedAt:
+          type: string
+          format: date-time
+          example: "2025-05-22T08:15:30Z"
+        indexedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: NULL dopóki nie ukończono indeksacji
+          example: "2025-05-22T08:16:45Z"
+        errorMessage:
+          type: string
+          nullable: true
+          description: Wypełnione tylko gdy status=FAILED
+      required:
+        - id
+        - filename
+        - mimeType
+        - sizeBytes
+        - status
+        - uploadedAt
+
+    DocumentSummary:
+      type: object
+      description: Lekka wersja dokumentu dla listy (bez pól mogących być długie)
+      properties:
+        id:
+          type: string
+          format: uuid
+        filename:
+          type: string
+        mimeType:
+          type: string
+        sizeBytes:
+          type: integer
+          format: int64
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+        uploadedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - filename
+        - mimeType
+        - sizeBytes
+        - status
+        - uploadedAt
+
+    DocumentStatusResponse:
+      type: object
+      description: Lekki response dla endpointu /status
+      properties:
+        id:
+          type: string
+          format: uuid
+        status:
+          $ref: '#/components/schemas/DocumentStatus'
+        indexedAt:
+          type: string
+          format: date-time
+          nullable: true
+        errorMessage:
+          type: string
+          nullable: true
+      required:
+        - id
+        - status
+
+    PaginatedDocumentResponse:
+      type: object
+      description: Strona dokumentów z metadanymi paginacji
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/DocumentSummary'
+        pagination:
+          $ref: '#/components/schemas/PageMetadata'
+      required:
+        - content
+        - pagination
+
+    # === Chat ===
+
+    MessageRole:
+      type: string
+      enum: [USER, ASSISTANT, SYSTEM]
+      description: |
+        Rola wiadomości w konwersacji:
+        - USER: wiadomość od end usera
+        - ASSISTANT: odpowiedź bota
+        - SYSTEM: wiadomość systemowa (rzadkie)
+
+    ChatSessionResponse:
+      type: object
+      description: Pełna sesja chatu
+      properties:
+        id:
+          type: string
+          format: uuid
+        anonymousId:
+          type: string
+          description: ID anonimowego end usera (z cookie / sessionStorage)
+          example: "anon-7f8c-..."
+        externalId:
+          type: string
+          nullable: true
+          description: Opcjonalny ID end usera od klienta
+          example: "acme-customer-123"
+        startedAt:
+          type: string
+          format: date-time
+        lastActivityAt:
+          type: string
+          format: date-time
+        metadata:
+          type: object
+          nullable: true
+          description: Opcjonalne metadane od klienta (URL, IP, user agent)
+          additionalProperties: true
+      required:
+        - id
+        - anonymousId
+        - startedAt
+        - lastActivityAt
+
+    ChatSessionSummary:
+      type: object
+      description: Lekka wersja sesji dla listy (bez metadata)
+      properties:
+        id:
+          type: string
+          format: uuid
+        anonymousId:
+          type: string
+        externalId:
+          type: string
+          nullable: true
+        startedAt:
+          type: string
+          format: date-time
+        lastActivityAt:
+          type: string
+          format: date-time
+        messageCount:
+          type: integer
+          description: Liczba wiadomości w sesji
+      required:
+        - id
+        - anonymousId
+        - startedAt
+        - lastActivityAt
+        - messageCount
+
+    StartSessionRequest:
+      type: object
+      description: Opcjonalne dane przy starcie sesji
+      properties:
+        anonymousId:
+          type: string
+          description: |
+            Jeśli klient ma już anonymous ID (z cookie), wysyła ten sam.
+            Jeśli pusty - serwer generuje nowy.
+          example: "anon-7f8c-..."
+        externalId:
+          type: string
+          nullable: true
+          description: ID end usera w systemie klienta
+          example: "acme-customer-123"
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Dodatkowe dane (URL strony, user agent)
+
+    Citation:
+      type: object
+      description: Cytat z dokumentu - źródło użyte w odpowiedzi
+      properties:
+        chunkId:
+          type: string
+          format: uuid
+        documentId:
+          type: string
+          format: uuid
+        documentFilename:
+          type: string
+          description: Nazwa dokumentu źródłowego
+          example: "owu-pzu-2025.pdf"
+        snippet:
+          type: string
+          description: Krótki fragment tekstu (max ~200 znaków)
+          example: "...odszkodowanie wypłacane jest w terminie 30 dni od..."
+        score:
+          type: number
+          format: double
+          description: Similarity score (0-1)
+          example: 0.87
+      required:
+        - chunkId
+        - documentId
+        - snippet
+        - score
+
+    MessageResponse:
+      type: object
+      description: Wiadomość w historii konwersacji
+      properties:
+        id:
+          type: string
+          format: uuid
+        role:
+          $ref: '#/components/schemas/MessageRole'
+        content:
+          type: string
+          example: "Czy mogę przedłużyć ubezpieczenie online?"
+        sources:
+          type: array
+          nullable: true
+          description: Cytaty (tylko dla role=ASSISTANT)
+          items:
+            $ref: '#/components/schemas/Citation'
+        tokensUsed:
+          type: integer
+          nullable: true
+          description: Tylko dla role=ASSISTANT
+        createdAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - role
+        - content
+        - createdAt
+
+    SendMessageRequest:
+      type: object
+      description: Wiadomość użytkownika do wysłania
+      properties:
+        content:
+          type: string
+          minLength: 1
+          maxLength: 4000
+          description: Treść wiadomości
+          example: "Czy mogę przedłużyć ubezpieczenie online?"
+      required:
+        - content
+
+    # SSE Event payloady (dokumentacja - nie używane bezpośrednio w response)
+
+    MessageChunkEvent:
+      type: object
+      description: SSE event "chunk" - kolejny fragment tekstu odpowiedzi
+      properties:
+        text:
+          type: string
+          description: Delta tekstu (cząstka odpowiedzi do dopisania)
+          example: "Tak, przedłużenie ubezpieczenia"
+      required:
+        - text
+
+    MessageSourcesEvent:
+      type: object
+      description: SSE event "sources" - lista cytatów
+      properties:
+        sources:
+          type: array
+          items:
+            $ref: '#/components/schemas/Citation'
+      required:
+        - sources
+
+    MessageDoneEvent:
+      type: object
+      description: SSE event "done" - koniec strumienia + finalne ID i statystyki
+      properties:
+        messageId:
+          type: string
+          format: uuid
+          description: ID zapisanej wiadomości ASSISTANT
+        tokensUsed:
+          type: integer
+          description: Liczba tokenów użytych w odpowiedzi
+      required:
+        - messageId
+        - tokensUsed
+
+    PaginatedChatSessionResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/ChatSessionSummary'
+        pagination:
+          $ref: '#/components/schemas/PageMetadata'
+      required:
+        - content
+        - pagination
+
+    PaginatedMessageResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/MessageResponse'
+        pagination:
+          $ref: '#/components/schemas/PageMetadata'
+      required:
+        - content
+        - pagination
+
+  # ----- Parameters -----
+  parameters:
+
+    PageParam:
+      name: page
+      in: query
+      required: false
+      description: Numer strony (0-based)
+      schema:
+        type: integer
+        minimum: 0
+        default: 0
+
+    SizeParam:
+      name: size
+      in: query
+      required: false
+      description: Rozmiar strony
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+
+    SortParam:
+      name: sort
+      in: query
+      required: false
+      description: |
+        Sortowanie w formacie `field,direction` gdzie direction = `asc` lub `desc`.
+        Multiple sort params możliwe dla sortowania kaskadowego.
+      schema:
+        type: string
+        example: "createdAt,desc"
+
+  # ----- Responses (reusable) -----
+  responses:
+
+    BadRequest:
+      description: Walidacja danych wejściowych nie powiodła się
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ValidationProblemDetail'
+
+    Unauthorized:
+      description: Brak lub nieprawidłowy token uwierzytelnienia (post-MVP)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+
+    Forbidden:
+      description: Brak uprawnień do tego zasobu
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+
+    NotFound:
+      description: Zasób nie istnieje (lub należy do innego tenanta)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+
+    Conflict:
+      description: Konflikt biznesowy (np. duplicate)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+
+    PayloadTooLarge:
+      description: Plik większy niż dozwolony limit (50MB)
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+
+    InternalServerError:
+      description: Błąd serwera - nieprzewidziany wyjątek
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+
+  # ----- Security (post-MVP) -----
+  # securitySchemes będą dodane gdy włączymy auth.
+  # Planowany scheme:
+  #   BearerAuth:
+  #     type: http
+  #     scheme: bearer
+  #     bearerFormat: JWT
+  # Plus widget endpoints z osobnym scheme:
+  #   WidgetKeyAuth:
+  #     type: apiKey
+  #     in: header
+  #     name: X-Widget-Key

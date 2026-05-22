@@ -1,0 +1,50 @@
+@startuml c4-container
+!include https://raw.githubusercontent.com/plantuml-stdlib/C4-PlantUML/master/C4_Container.puml
+
+title Multibot - Diagram komponentów (C4 Level 2)
+
+Person(admin, "Admin firmy", "Pracownik Tenanta")
+Person(enduser, "End user", "Klient firmy-Tenanta")
+
+System_Boundary(multibot, "Multibot Platform") {
+    Container(panel, "Frontend Panel", "React 18 + Vite + shadcn/ui", "Panel admina: zarządzanie dokumentami, historia rozmów, statystyki, chat testowy.")
+    Container(widget, "Widget JS", "Preact / vanilla TS", "Lekki bundle (~50KB) embeddowany na stronie Tenanta. Shadow DOM, izolacja CSS.\n[POST-MVP]")
+
+    Container(api, "Backend API", "Spring Boot 3, Java 21", "REST API. Trzyma TenantContext per request. Auth, dokumenty, chat, statystyki.")
+    Container(indexer, "Document Indexer", "Spring @Async", "Worker: extract (Tika) → chunk → embed → zapis do pgvector. W MVP w tym samym procesie, później do wyciągnięcia.")
+    Container(rag, "RAG Service", "Spring AI", "Embedding pytania → search w pgvector (filtr tenant_id) → budowa promptu → call do LLM ze streamingiem.")
+
+    ContainerDb(db, "PostgreSQL", "Postgres 16 + pgvector", "Jedna baza: dane relacyjne + wektory. Multi-tenancy przez kolumnę tenant_id.")
+    Container(storage, "File Storage", "FS / S3", "Surowe pliki wgrane przez Adminów. MVP: katalog lokalny. Produkcja: S3.")
+}
+
+System_Ext(anthropic, "Anthropic API", "LLM Claude")
+System_Ext(openai, "OpenAI API", "Embeddingi")
+
+Rel(admin, panel, "Używa", "HTTPS")
+Rel(enduser, widget, "Rozmawia z botem", "HTTPS + SSE")
+
+Rel(panel, api, "Wywołuje", "JSON/REST + JWT*")
+Rel(widget, api, "Wywołuje publiczne endpointy", "JSON/REST + widget token")
+
+Rel(api, db, "Czyta i zapisuje", "JDBC")
+Rel(api, storage, "Zapisuje uploaded pliki", "FS / S3 API")
+Rel(api, indexer, "Wyzwala indeksację", "async call")
+Rel(api, rag, "Deleguje zapytania chatu", "in-process")
+
+Rel(indexer, storage, "Czyta pliki", "FS / S3 API")
+Rel(indexer, openai, "Generuje embeddingi", "HTTPS")
+Rel(indexer, db, "Zapisuje chunki i status", "JDBC")
+
+Rel(rag, db, "Vector search + historia rozmów", "JDBC")
+Rel(rag, openai, "Embedding pytania", "HTTPS")
+Rel(rag, anthropic, "LLM call ze streamingiem", "HTTPS")
+
+note right of api
+  * MVP: auth wyłączony,
+  tenant_id=1 hardcoded.
+  Patrz multi-tenancy.md
+end note
+
+SHOW_LEGEND()
+@enduml

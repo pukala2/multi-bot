@@ -1,0 +1,48 @@
+# =============================================================================
+# Multibot - .gitignore
+# =============================================================================
+
+# ----- Secrets - NEVER commit -----
+.env
+*.pem
+*.key
+
+# ----- File storage (uploaded files) -----
+storage/
+
+# ----- Java / Maven -----
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# ----- IDE -----
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+.factorypath
+
+# ----- OS -----
+.DS_Store
+Thumbs.db
+
+# ----- Spring Boot -----
+HELP.md
+spring-modulith-docs/
+
+# ----- Logs -----
+*.log
+logs/
+
+# ----- Generated OpenAPI code -----
+# Generated do target/, ale na wszelki wypadek:
+generated-sources/
+
+# ----- Bundled OpenAPI (jeśli kiedyś dodamy) -----
+docs/api/openapi-bundled.yaml
