@@ -38,10 +38,10 @@ spring:
       - classpath:db/migration/common
       - classpath:db/migration/tenant
       - classpath:db/migration/file
+      - classpath:db/migration/vector
       # Kolejne moduły dodawane gdy implementujemy:
       # - classpath:db/migration/document
       # - classpath:db/migration/chat
-      # - classpath:db/migration/vector
       # - classpath:db/migration/indexing
 
   # ----- Multipart (upload plików) -----
