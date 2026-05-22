@@ -21,6 +21,7 @@ spring:
 
   # ----- JPA / Hibernate -----
   jpa:
+    open-in-view: false
     hibernate:
       ddl-auto: validate          # Flyway zarządza schematem
     properties:
@@ -55,7 +56,7 @@ spring:
       republish-outstanding-events-on-restart: true
       jdbc:
         schema-initialization:
-          enabled: false           # tworzymy event_publication przez Flyway
+          enabled: false
 
   # ----- Spring AI -----
   ai:

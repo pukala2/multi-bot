@@ -6,6 +6,7 @@ Platforma SaaS B2B do zarządzania chatbotami AI z RAG dla firm.
 
 ### Punkt startowy
 - [brief.md](brief.md) - oryginalny brief biznesowo-techniczny
+- [../multibot-backend/implementation-plan.md](../multibot-backend/implementation-plan.md) - plan implementacji backendu MVP (8 faz)
 
 ### `concept/` - CO i DLACZEGO
 - [vision.md](concept/vision.md) - wizja, target, model biznesowy

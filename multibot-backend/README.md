@@ -17,21 +17,30 @@ Pełna dokumentacja architektoniczna w [`../docs/`](../docs/).
 ### Setup
 
 ```bash
-# 1. Z katalogu multibot/ - skopiuj .env.example
-cd ..
+# 1. Skopiuj .env.example do .env i wpisz klucze API
 cp .env.example .env
-# Edytuj .env - wpisz ANTHROPIC_API_KEY i OPENAI_API_KEY
+# Edytuj .env - ANTHROPIC_API_KEY i OPENAI_API_KEY
 
-# 2. Uruchom Postgres + pgvector
+# 2. Uruchom Postgres + pgvector (z katalogu multibot/)
+cd ..
 docker-compose up -d
 docker-compose ps   # sprawdź że postgres jest "healthy"
 
-# 3. Uruchom backend
+# 3. Uruchom backend - załaduj .env i odpal
 cd multibot-backend
-./mvnw spring-boot:run
+set -a && source .env && set +a && ./mvnw spring-boot:run
 ```
 
-Albo z IntelliJ: otwórz `pom.xml` jako projekt → Run `MultibotApplication`.
+**Spring Boot nie czyta `.env` natywnie** - trzeba załadować zmienne do shella przed startem (`set -a && source .env && set +a`).
+
+### Albo z IntelliJ
+
+1. Otwórz `pom.xml` jako projekt
+2. Run/Debug Configuration dla `MultibotApplication`
+3. **Environment variables** → kliknij ikonkę "Browse" → wybierz plik `.env`
+   - W nowszych IntelliJ (2024.1+) działa bez pluginu
+   - W starszych: zainstaluj plugin "EnvFile" i użyj "EnvFile" tab
+4. Run
 
 ### Sprawdzenie
 

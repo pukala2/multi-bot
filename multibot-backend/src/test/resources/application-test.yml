@@ -1,0 +1,15 @@
+spring:
+  ai:
+    anthropic:
+      api-key: test-anthropic-key
+    openai:
+      api-key: test-openai-key
+
+multibot:
+  tenancy:
+    mode: mock
+
+logging:
+  level:
+    root: WARN
+    com.multibot: INFO
