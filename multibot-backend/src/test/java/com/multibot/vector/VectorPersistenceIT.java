@@ -47,6 +47,8 @@ class VectorPersistenceIT extends IntegrationTestBase {
     void setUpTenant() {
         TenantContext.set(DEFAULT_TENANT);
         jdbc.update("DELETE FROM chunks");
+        jdbc.update("DELETE FROM documents");
+        jdbc.update("DELETE FROM stored_files");
     }
 
     @AfterEach
@@ -57,7 +59,7 @@ class VectorPersistenceIT extends IntegrationTestBase {
     @Test
     @DisplayName("storeAll persists chunks and search returns closest matches by cosine similarity")
     void shouldStoreAndSearchChunks() {
-        UUID documentId = UUID.randomUUID();
+        UUID documentId = createDummyDocument(DEFAULT_TENANT);
         Embedding queryEmbedding = unitVector(0);
 
         List<Chunk> chunks = List.of(
@@ -78,7 +80,7 @@ class VectorPersistenceIT extends IntegrationTestBase {
     @Test
     @DisplayName("Search respects min score - returns nothing when all candidates below threshold")
     void shouldFilterByMinScore() {
-        UUID documentId = UUID.randomUUID();
+        UUID documentId = createDummyDocument(DEFAULT_TENANT);
         Embedding query = unitVector(0);
         storeChunksUseCase.storeAll(List.of(
                 chunk(documentId, 0, "low match", similarVector(query, 0.2f))));
@@ -92,8 +94,8 @@ class VectorPersistenceIT extends IntegrationTestBase {
     @Test
     @DisplayName("deleteByDocument removes all chunks of a document")
     void shouldDeleteChunksByDocument() {
-        UUID docA = UUID.randomUUID();
-        UUID docB = UUID.randomUUID();
+        UUID docA = createDummyDocument(DEFAULT_TENANT);
+        UUID docB = createDummyDocument(DEFAULT_TENANT);
         Embedding query = unitVector(0);
         storeChunksUseCase.storeAll(List.of(
                 chunk(docA, 0, "A1", similarVector(query, 0.9f)),
@@ -117,7 +119,7 @@ class VectorPersistenceIT extends IntegrationTestBase {
                 VALUES (?, ?, ?, 'FREE', 'ACTIVE', NOW(), NOW())
                 """, tenantB.value(), "Tenant B", "tenant-b");
 
-        UUID documentId = UUID.randomUUID();
+        UUID documentId = createDummyDocument(tenantB);
         Embedding query = unitVector(0);
         Embedding closeMatch = similarVector(query, 0.99f);
 
@@ -141,7 +143,7 @@ class VectorPersistenceIT extends IntegrationTestBase {
     @Test
     @DisplayName("Chunk metadata is persisted and returned as JSON")
     void shouldPersistChunkMetadata() {
-        UUID documentId = UUID.randomUUID();
+        UUID documentId = createDummyDocument(DEFAULT_TENANT);
         Embedding query = unitVector(0);
         Chunk chunk = new Chunk(
                 ChunkId.generate(),
@@ -203,5 +205,21 @@ class VectorPersistenceIT extends IntegrationTestBase {
         int perpPos = basePos == 0 ? 1 : 0;
         result[perpPos] = perpComponent;
         return Embedding.of(result);
+    }
+
+    private UUID createDummyDocument(TenantId tenant) {
+        UUID storedFileId = UUID.randomUUID();
+        UUID documentId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO stored_files (id, tenant_id, original_filename, mime_type, size_bytes, storage_key, created_at)
+                VALUES (?, ?, 'test.pdf', 'application/pdf', 100, ?, NOW())
+                """, storedFileId, tenant.value(),
+                "tenants/" + tenant.value() + "/files/" + storedFileId + ".pdf");
+        jdbc.update("""
+                INSERT INTO documents (id, tenant_id, stored_file_id, filename, mime_type, size_bytes,
+                                       status, uploaded_at, created_at, updated_at)
+                VALUES (?, ?, ?, 'test.pdf', 'application/pdf', 100, 'PENDING', NOW(), NOW(), NOW())
+                """, documentId, tenant.value(), storedFileId);
+        return documentId;
     }
 }

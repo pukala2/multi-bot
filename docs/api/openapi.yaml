@@ -70,7 +70,12 @@ paths:
                 file:
                   type: string
                   format: binary
-                  description: Plik dokumentu (max 50MB)
+                  description: |
+                    Plik dokumentu. Max 50MB. Akceptowane rozszerzenia:
+                    `.pdf`, `.docx`, `.txt`, `.md`.
+
+                    Walidacja po stronie serwera odrzuca nieobsługiwane formaty
+                    z kodem 400 i `code=VALIDATION_FAILED`.
                 filename:
                   type: string
                   description: Opcjonalna nazwa pliku (jeśli inna niż oryginalna)

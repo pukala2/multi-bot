@@ -142,7 +142,6 @@ class PgVectorChunkStoreAdapter implements ChunkStore {
 
     private static double clamp(double value) {
         if (value < 0.0) return 0.0;
-        if (value > 1.0) return 1.0;
-        return value;
+        return Math.min(value, 1.0);
     }
 }
