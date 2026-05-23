@@ -25,6 +25,8 @@ import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
@@ -32,6 +34,8 @@ import java.time.Instant;
 @Service
 class DocumentService implements UploadDocumentUseCase, GetDocumentUseCase, GetDocumentStatusUseCase,
         ListDocumentsUseCase, DeleteDocumentUseCase, UpdateDocumentStatusUseCase {
+
+    private static final Logger log = LoggerFactory.getLogger(DocumentService.class);
 
     private final DocumentRepository repository;
     private final StoreFileUseCase storeFileUseCase;
@@ -69,6 +73,9 @@ class DocumentService implements UploadDocumentUseCase, GetDocumentUseCase, GetD
                 Instant.now());
 
         Document saved = repository.save(document);
+
+        log.info("Document uploaded: id={}, filename={}, size={}B",
+                saved.id(), saved.filename(), saved.sizeBytes());
 
         events.publishEvent(new DocumentUploadedEvent(
                 saved.id(),
@@ -108,6 +115,8 @@ class DocumentService implements UploadDocumentUseCase, GetDocumentUseCase, GetD
         deleteChunksUseCase.deleteByDocument(document.id().value());
         repository.deleteById(id);
         deleteFileUseCase.delete(document.storedFileId());
+
+        log.info("Document deleted: id={}, filename={}", id, document.filename());
 
         events.publishEvent(new DocumentDeletedEvent(document.id(), document.tenantId()));
     }

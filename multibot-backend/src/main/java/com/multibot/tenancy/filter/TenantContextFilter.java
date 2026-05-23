@@ -6,6 +6,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.slf4j.MDC;
 import org.springframework.core.Ordered;
 import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
@@ -17,6 +18,8 @@ import java.io.IOException;
 @Order(Ordered.HIGHEST_PRECEDENCE + 10)
 public class TenantContextFilter extends OncePerRequestFilter {
 
+    public static final String MDC_KEY = "tenantId";
+
     private final TenantResolver tenantResolver;
 
     public TenantContextFilter(TenantResolver tenantResolver) {
@@ -27,9 +30,13 @@ public class TenantContextFilter extends OncePerRequestFilter {
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain chain)
             throws ServletException, IOException {
         try {
-            tenantResolver.resolve(request).ifPresent(TenantContext::set);
+            tenantResolver.resolve(request).ifPresent(tenant -> {
+                TenantContext.set(tenant);
+                MDC.put(MDC_KEY, tenant.value().toString());
+            });
             chain.doFilter(request, response);
         } finally {
+            MDC.remove(MDC_KEY);
             TenantContext.clear();
         }
     }

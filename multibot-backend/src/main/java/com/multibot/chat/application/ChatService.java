@@ -128,8 +128,11 @@ class ChatService implements StartSessionUseCase, SendMessageUseCase, StreamMess
 
         MessageId assistantMessageId = MessageId.generate();
 
+        java.util.Map<String, String> capturedMdc = org.slf4j.MDC.getCopyOfContextMap();
+
         java.util.function.BiConsumer<String, Integer> onComplete = (fullText, tokensUsed) -> {
             TenantContext.set(tenant);
+            if (capturedMdc != null) org.slf4j.MDC.setContextMap(capturedMdc);
             try {
                 Instant now = Instant.now();
                 Message assistantMessage = new Message(
@@ -139,12 +142,14 @@ class ChatService implements StartSessionUseCase, SendMessageUseCase, StreamMess
                 repository.saveMessage(assistantMessage);
                 repository.saveSession(session.touchedAt(now));
             } finally {
+                org.slf4j.MDC.clear();
                 TenantContext.clear();
             }
         };
 
         java.util.function.Consumer<Throwable> onError = error -> {
             TenantContext.set(tenant);
+            if (capturedMdc != null) org.slf4j.MDC.setContextMap(capturedMdc);
             try {
                 Instant now = Instant.now();
                 Message errorMessage = new Message(
@@ -153,6 +158,7 @@ class ChatService implements StartSessionUseCase, SendMessageUseCase, StreamMess
                         java.util.List.of(), java.util.Optional.empty(), now);
                 repository.saveMessage(errorMessage);
             } finally {
+                org.slf4j.MDC.clear();
                 TenantContext.clear();
             }
         };
