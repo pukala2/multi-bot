@@ -4,6 +4,9 @@ import com.multibot.rag.domain.port.out.LlmClient;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Primary;
+import reactor.core.publisher.Flux;
+
+import java.time.Duration;
 
 @TestConfiguration
 public class MockLlmConfig {
@@ -11,9 +14,21 @@ public class MockLlmConfig {
     @Bean(name = "mockLlmClient")
     @Primary
     public LlmClient mockLlmClient() {
-        return (prompt, temperature, maxTokens) -> {
-            String answer = "Mock answer based on " + countContextChunks(prompt) + " context chunks.";
-            return new LlmClient.LlmResponse(answer, answer.length() / 4);
+        return new LlmClient() {
+            @Override
+            public LlmResponse complete(String prompt, double temperature, int maxTokens) {
+                String answer = "Mock answer based on " + countContextChunks(prompt) + " context chunks.";
+                return new LlmResponse(answer, answer.length() / 4);
+            }
+
+            @Override
+            public Flux<String> stream(String prompt, double temperature, int maxTokens) {
+                String answer = "Mock answer based on " + countContextChunks(prompt) + " context chunks.";
+                String[] words = answer.split(" ");
+                return Flux.fromArray(words)
+                        .delayElements(Duration.ofMillis(5))
+                        .map(word -> word + " ");
+            }
         };
     }
 

@@ -4,6 +4,7 @@ import com.multibot.rag.domain.port.out.LlmClient;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
 import org.springframework.stereotype.Component;
+import reactor.core.publisher.Flux;
 
 @Component
 @ConditionalOnMissingBean(name = "mockLlmClient")
@@ -23,6 +24,11 @@ class SpringAiLlmClientAdapter implements LlmClient {
         }
         int approxTokens = estimateTokens(text);
         return new LlmResponse(text, approxTokens);
+    }
+
+    @Override
+    public Flux<String> stream(String prompt, double temperature, int maxTokens) {
+        return chatClient.prompt(prompt).stream().content();
     }
 
     private static int estimateTokens(String text) {

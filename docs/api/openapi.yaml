@@ -314,20 +314,15 @@ paths:
       responses:
         '200':
           description: |
-            Odpowiedź bota.
+            Odpowiedź bota - blocking JSON `MessageResponse`.
 
-            **MVP (Faza 6):** blocking JSON `MessageResponse`.
-
-            **Post-MVP (Faza 7):** Server-Sent Events stream z eventami `chunk`, `sources`, `done`.
+            **Streaming SSE:** ten sam endpoint `POST /api/chat/sessions/{id}/messages`
+            obsługuje także `Accept: text/event-stream` i wtedy zwraca stream z eventami
+            `chunk`, `sources`, `done` (impl: osobny handler w controllerze poza OpenAPI spec).
           content:
             application/json:
               schema:
                 $ref: '#/components/schemas/MessageResponse'
-            text/event-stream:
-              schema:
-                type: string
-                description: |
-                  Server-Sent Events stream (post-MVP).
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
