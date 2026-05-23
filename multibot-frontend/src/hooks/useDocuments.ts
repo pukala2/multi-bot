@@ -8,6 +8,8 @@ interface UseDocumentsParams {
   sort?: string;
 }
 
+const PROCESSING_STATUSES = ['PENDING', 'PROCESSING'];
+
 export function useDocuments({ page = 0, size = 20, sort = 'uploadedAt,desc' }: UseDocumentsParams = {}) {
   return useQuery({
     queryKey: ['documents', { page, size, sort }],
@@ -16,6 +18,13 @@ export function useDocuments({ page = 0, size = 20, sort = 'uploadedAt,desc' }: 
         params: { query: { page, size, sort } },
       });
       return unwrap(result);
+    },
+    refetchInterval: (query) => {
+      const data = query.state.data;
+      const stillProcessing = data?.content?.some((doc) =>
+        PROCESSING_STATUSES.includes(doc.status as string)
+      );
+      return stillProcessing ? 2_000 : false;
     },
   });
 }

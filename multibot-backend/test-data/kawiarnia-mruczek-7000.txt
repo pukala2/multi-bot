@@ -1,0 +1,80 @@
+KAWIARNIA "MRUCZEK-7000"
+=========================
+
+Pierwsza w Polsce kosmokawiarnia z AI-kotami w technologii NeuroPaw.
+
+Adres: ul. Łapkowa 17/3, 30-088 Kraków
+Telefon: +48 12 555 MRUCZEK (czynne 24h)
+Email: kontakt@mruczek-7000.example
+
+Godziny otwarcia:
+- Poniedziałek - czwartek: 8:00 - 22:00
+- Piątek - sobota: 8:00 - 02:00
+- Niedziela: 10:00 - 20:00
+
+
+KOTY-ASYSTENCI
+==============
+
+W kawiarni rezyduje 9 kotów-asystentów wyposażonych w neurochip TabbyMind-3.
+Każdy kot ma unikalną osobowość i specjalizację:
+
+1. Whiskerton - specjalista ds. matematyki (rozwiązuje równania kwadratowe)
+2. Pawcasso - tworzy abstrakcyjne obrazy łapką (płótno 30x30 cm za 89 zł)
+3. Mrowczak Borys - przewodnik medytacji (sesje 15-minutowe za 25 zł)
+4. Karmelina - sommelier herbat (rekomenduje 47 rodzajów napoju)
+5. Tofik - czyta na głos książki (max 30 min, każda strona = 1 mruczenie)
+6. Pluszka - asystent dziecięcy (zajmuje dzieci do 8 roku życia)
+7. Inżynier Bąbel - testuje ergonomię foteli (oficjalny certyfikat ISO-Cat)
+8. Dr Wąsacz - terapia mruczeniem (40 Hz, działa anty-stresowo)
+9. Major Pchełka - ochrona obiektu (nie da się głaskać przed 14:00)
+
+
+MENU
+====
+
+Kawy autorskie (przygotowywane przez baristę-robota R2-Espresso):
+
+- "Mruczek Latte" - 18,50 zł (z mlekiem owsianym i syropem walerianowym dla ludzi)
+- "Czarny Karmel" - 14,00 zł (espresso 50ml + karmelina z trzciny)
+- "Sierść Anioła" - 22,00 zł (cappuccino z pianką w kształcie kota)
+- "Zimna Łapka" - 16,50 zł (mrożona kawa + bita śmietana + sezamek)
+- "Mocno Wąsate" - 19,00 zł (potrójne espresso, tylko dla wytrwałych)
+
+Słodkości:
+
+- Sernik "Drapak Wiedeński" - 24,00 zł (porcja 180g)
+- Brownie "Czarny Sierściuch" - 18,00 zł
+- Ciasteczka kostki-rybki - 4,50 zł / sztuka
+
+
+CENNIK USŁUG SPECJALNYCH
+========================
+
+- Wynajem prywatnej kabiny "Klatka Premium" - 145 zł / godzina (do 4 osób)
+- Sesja zdjęciowa z kotem (15 min) - 89 zł
+- Workshop "Jak rozumieć mruczenie" (90 min) - 199 zł / osoba
+- Karnet "Stały Bywalec" (10 wizyt) - 350 zł (oszczędność ~120 zł)
+- Voucher prezentowy 100 zł - sprzedajemy za 94 zł (rabat 6%)
+
+
+REGULAMIN
+=========
+
+1. Maksymalny czas pobytu: 3 godziny w soboty, bez limitu w pozostałe dni.
+2. Głaskanie kotów dozwolone wyłącznie od 14:00 (z wyjątkiem Pluszki).
+3. Karmienie kotów - zabronione. Mają dietę zatwierdzoną przez weterynarza.
+4. Dzieci poniżej 5 lat - tylko pod opieką osoby dorosłej.
+5. Alergicy: ostrzegamy że w lokalu jest sierść kocia, mimo systemu filtracji NeuroAir-7.
+6. Rezerwacja stolika obowiązuje pt-sob od 18:00 (telefoniczna lub przez stronę).
+
+
+CIEKAWOSTKI
+===========
+
+- Założyciel: Mateusz "Kocidło" Szczęsny (były astronom)
+- Rok otwarcia: 2019 (3 lata po pomyśle, który powstał na konferencji NekoCon)
+- Trzykrotny zwycięzca Polskiej Nagrody Kotokawiarni (2021, 2022, 2024)
+- Najwierniejszy klient: Pan Roman, 73 lata, odwiedził lokal 412 razy
+- Najdroższy element wystroju: rzeźba "Kot Schrödingera" z miedzi - 14 800 zł
+- Średnia ocena Google: 4.9/5 (na podstawie 2 847 opinii)

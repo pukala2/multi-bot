@@ -3,6 +3,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { AppShell } from '@/components/layout/AppShell';
 import { DashboardPage } from '@/pages/DashboardPage';
+import { DocumentsPage } from '@/pages/DocumentsPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 
 const queryClient = new QueryClient({
@@ -22,16 +23,7 @@ export default function App() {
         <Routes>
           <Route element={<AppShell />}>
             <Route path="/" element={<DashboardPage />} />
-            <Route
-              path="/documents"
-              element={
-                <PlaceholderPage
-                  title="Dokumenty"
-                  phaseLabel="Faza F3"
-                  description="Tabela dokumentów, drag & drop upload, śledzenie statusu indeksowania, usuwanie z potwierdzeniem. W przygotowaniu."
-                />
-              }
-            />
+            <Route path="/documents" element={<DocumentsPage />} />
             <Route
               path="/chat"
               element={
@@ -58,7 +50,7 @@ export default function App() {
                 <PlaceholderPage
                   title="Ustawienia"
                   phaseLabel="Po MVP"
-                  description="Konfiguracja bota: próg dopasowania, liczba chunków, temperatura modelu, prompt systemowy."
+                  description="Dostosuj sposób działania bota: jak rygorystycznie szuka odpowiedzi, ile źródeł bierze pod uwagę, jaki styl odpowiedzi preferuje."
                 />
               }
             />
