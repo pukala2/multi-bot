@@ -13,7 +13,7 @@ export function Topbar({ title, actions }: TopbarProps) {
       <div className="flex gap-2 items-center">
         <div className="relative">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-text-muted pointer-events-none" />
-          <Input placeholder="Search anything…" className="pl-9 w-[280px]" />
+          <Input placeholder="Szukaj…" className="pl-9 w-[280px]" />
         </div>
         {actions}
       </div>

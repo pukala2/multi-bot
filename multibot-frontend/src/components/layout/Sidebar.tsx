@@ -6,17 +6,17 @@ const NAV_GROUPS = [
   {
     label: 'Główne',
     items: [
-      { to: '/', icon: LayoutDashboard, label: 'Dashboard' },
-      { to: '/documents', icon: FileText, label: 'Documents' },
-      { to: '/chat', icon: MessageSquare, label: 'Chat Playground' },
-      { to: '/sessions', icon: Inbox, label: 'Sessions' },
+      { to: '/', icon: LayoutDashboard, label: 'Panel' },
+      { to: '/documents', icon: FileText, label: 'Dokumenty' },
+      { to: '/chat', icon: MessageSquare, label: 'Testowy czat' },
+      { to: '/sessions', icon: Inbox, label: 'Sesje' },
     ],
   },
   {
     label: 'System',
     items: [
-      { to: '/settings', icon: Settings, label: 'Settings' },
-      { to: '/analytics', icon: BarChart3, label: 'Analytics' },
+      { to: '/settings', icon: Settings, label: 'Ustawienia' },
+      { to: '/analytics', icon: BarChart3, label: 'Analityka' },
     ],
   },
 ];

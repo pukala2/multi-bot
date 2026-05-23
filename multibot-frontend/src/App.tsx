@@ -26,9 +26,9 @@ export default function App() {
               path="/documents"
               element={
                 <PlaceholderPage
-                  title="Documents"
+                  title="Dokumenty"
                   phaseLabel="Faza F3"
-                  description="Tabela dokumentów, drag&drop upload, status polling, delete confirmation. W przygotowaniu."
+                  description="Tabela dokumentów, drag & drop upload, śledzenie statusu indeksowania, usuwanie z potwierdzeniem. W przygotowaniu."
                 />
               }
             />
@@ -36,9 +36,9 @@ export default function App() {
               path="/chat"
               element={
                 <PlaceholderPage
-                  title="Chat Playground"
+                  title="Testowy czat"
                   phaseLabel="Faza F4"
-                  description="Test bota z SSE streamingiem, sources panel, markdown rendering. W przygotowaniu."
+                  description="Test bota ze streamingiem SSE, panel źródeł, formatowanie Markdown. W przygotowaniu."
                 />
               }
             />
@@ -46,9 +46,9 @@ export default function App() {
               path="/sessions"
               element={
                 <PlaceholderPage
-                  title="Sessions"
+                  title="Sesje"
                   phaseLabel="Faza F5"
-                  description="Historia sesji userów, filtrowanie po dacie, podgląd całych rozmów. W przygotowaniu."
+                  description="Historia rozmów użytkowników, filtrowanie po dacie, podgląd całych konwersacji. W przygotowaniu."
                 />
               }
             />
@@ -56,9 +56,9 @@ export default function App() {
               path="/settings"
               element={
                 <PlaceholderPage
-                  title="Settings"
-                  phaseLabel="Faza 2"
-                  description="Konfiguracja bota: min-score, top-k, temperature, system prompt. Po MVP."
+                  title="Ustawienia"
+                  phaseLabel="Po MVP"
+                  description="Konfiguracja bota: próg dopasowania, liczba chunków, temperatura modelu, prompt systemowy."
                 />
               }
             />
@@ -66,9 +66,9 @@ export default function App() {
               path="/analytics"
               element={
                 <PlaceholderPage
-                  title="Analytics"
-                  phaseLabel="Faza 2"
-                  description="Metryki użycia, top pytania, kosztowność. Po MVP."
+                  title="Analityka"
+                  phaseLabel="Po MVP"
+                  description="Metryki użycia, najczęstsze pytania, koszty tokenów w czasie."
                 />
               }
             />
@@ -77,8 +77,8 @@ export default function App() {
               element={
                 <PlaceholderPage
                   title="404"
-                  phaseLabel="Not Found"
-                  description="Tej strony nie ma. Wróć do Dashboard albo sprawdź pasek adresu."
+                  phaseLabel="Nie znaleziono"
+                  description="Tej strony nie ma. Wróć do panelu albo sprawdź pasek adresu."
                 />
               }
             />
