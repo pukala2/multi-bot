@@ -1,0 +1,157 @@
+.multibot-widget-root {
+  --mb-accent: #7B5BFF;
+  --mb-bg: #FFFFFF;
+  --mb-bg-soft: #F6F6F8;
+  --mb-border: #E5E5EA;
+  --mb-text: #1A1A1F;
+  --mb-text-muted: #6E6E76;
+  --mb-shadow: 0 12px 40px rgba(0, 0, 0, 0.15);
+
+  position: fixed;
+  z-index: 2147483600;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--mb-text);
+}
+.multibot-widget-root.pos-bottom-right { bottom: 20px; right: 20px; }
+.multibot-widget-root.pos-bottom-left  { bottom: 20px; left: 20px;  }
+.multibot-widget-root *, .multibot-widget-root *::before, .multibot-widget-root *::after {
+  box-sizing: border-box;
+}
+
+.multibot-bubble {
+  width: 56px; height: 56px;
+  border-radius: 50%;
+  background: var(--mb-accent);
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  box-shadow: var(--mb-shadow);
+  border: none;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.multibot-bubble:hover { transform: translateY(-2px); box-shadow: 0 16px 48px rgba(0,0,0,0.2); }
+.multibot-bubble svg { width: 26px; height: 26px; }
+
+.multibot-window {
+  width: 360px;
+  height: 540px;
+  max-height: calc(100vh - 60px);
+  background: var(--mb-bg);
+  border-radius: 14px;
+  box-shadow: var(--mb-shadow);
+  display: flex; flex-direction: column;
+  overflow: hidden;
+  border: 1px solid var(--mb-border);
+}
+
+.multibot-header {
+  background: var(--mb-accent);
+  color: white;
+  padding: 14px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+.multibot-header-title { font-weight: 600; font-size: 15px; }
+.multibot-header-close {
+  background: rgba(255,255,255,0.15);
+  border: none; color: white;
+  width: 28px; height: 28px; border-radius: 6px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+}
+.multibot-header-close:hover { background: rgba(255,255,255,0.25); }
+.multibot-header-close svg { width: 14px; height: 14px; }
+
+.multibot-messages {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex; flex-direction: column; gap: 10px;
+  background: var(--mb-bg-soft);
+}
+.multibot-messages::-webkit-scrollbar { width: 6px; }
+.multibot-messages::-webkit-scrollbar-thumb { background: #D0D0D5; border-radius: 3px; }
+
+.multibot-msg {
+  max-width: 85%;
+  padding: 9px 13px;
+  border-radius: 14px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+}
+.multibot-msg.bot {
+  background: white;
+  border: 1px solid var(--mb-border);
+  border-bottom-left-radius: 4px;
+  align-self: flex-start;
+}
+.multibot-msg.user {
+  background: var(--mb-accent);
+  color: white;
+  border-bottom-right-radius: 4px;
+  align-self: flex-end;
+}
+.multibot-typing {
+  display: inline-flex; gap: 4px; padding: 4px 0;
+}
+.multibot-typing-dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--mb-text-muted);
+  animation: mb-bounce 1.2s infinite;
+}
+.multibot-typing-dot:nth-child(2) { animation-delay: 0.15s; }
+.multibot-typing-dot:nth-child(3) { animation-delay: 0.3s; }
+@keyframes mb-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.5; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+.multibot-input-row {
+  padding: 10px;
+  display: flex; gap: 8px;
+  border-top: 1px solid var(--mb-border);
+  background: white;
+}
+.multibot-input {
+  flex: 1;
+  border: 1px solid var(--mb-border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13.5px;
+  font-family: inherit;
+  resize: none;
+  outline: none;
+  min-height: 38px;
+  max-height: 100px;
+  color: var(--mb-text);
+}
+.multibot-input:focus { border-color: var(--mb-accent); }
+.multibot-input::placeholder { color: var(--mb-text-muted); }
+
+.multibot-send {
+  background: var(--mb-accent);
+  color: white;
+  border: none;
+  border-radius: 10px;
+  width: 38px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: background 0.15s;
+}
+.multibot-send:hover:not(:disabled) { background: color-mix(in srgb, var(--mb-accent) 90%, white); }
+.multibot-send:disabled { opacity: 0.4; cursor: not-allowed; }
+.multibot-send svg { width: 16px; height: 16px; }
+
+.multibot-footer {
+  text-align: center;
+  padding: 6px;
+  font-size: 11px;
+  color: var(--mb-text-muted);
+  background: var(--mb-bg-soft);
+  border-top: 1px solid var(--mb-border);
+}
+.multibot-footer a { color: var(--mb-accent); text-decoration: none; }
+.multibot-footer a:hover { text-decoration: underline; }

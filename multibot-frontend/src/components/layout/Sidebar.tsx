@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, FileText, MessageSquare, Inbox, Settings, BarChart3 } from 'lucide-react';
+import { LayoutDashboard, FileText, MessageSquare, Inbox, Settings, BarChart3, Code } from 'lucide-react';
 import { cn } from '@/lib/cn';
 
 const NAV_GROUPS = [
@@ -10,6 +10,7 @@ const NAV_GROUPS = [
       { to: '/documents', icon: FileText, label: 'Dokumenty' },
       { to: '/chat', icon: MessageSquare, label: 'Testowy czat' },
       { to: '/sessions', icon: Inbox, label: 'Sesje' },
+      { to: '/widget', icon: Code, label: 'Widget' },
     ],
   },
   {

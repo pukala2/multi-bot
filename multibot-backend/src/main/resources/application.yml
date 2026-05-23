@@ -42,6 +42,7 @@ spring:
       - classpath:db/migration/document
       - classpath:db/migration/indexing
       - classpath:db/migration/chat
+      - classpath:db/migration/widget
 
   # ----- Multipart (upload plików) -----
   servlet:

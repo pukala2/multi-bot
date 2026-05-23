@@ -330,6 +330,69 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/admin/widget:
+    get:
+      tags:
+        - WidgetAdmin
+      summary: Pobierz konfigurację widgetu (operator)
+      description: Zwraca publishable key + settings widgetu dla aktualnego tenanta.
+      operationId: getWidgetAdminConfig
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WidgetAdminConfigResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags:
+        - WidgetAdmin
+      summary: Zaktualizuj settings widgetu
+      operationId: updateWidgetSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WidgetSettingsRequest'
+      responses:
+        '200':
+          description: Zapisane
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WidgetSettingsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
+  /api/widget/config:
+    get:
+      tags:
+        - Widget
+      summary: Publiczna konfiguracja widgetu po kluczu
+      description: Endpoint wywoływany przez widget na stronie klienta przy pierwszym ładowaniu.
+      operationId: getWidgetPublicConfig
+      parameters:
+        - name: key
+          in: query
+          required: true
+          schema:
+            type: string
+          example: pk_widget_live_a1b2c3d4
+      responses:
+        '200':
+          description: Settings widgetu
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WidgetSettingsResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/admin/stats:
     get:
       tags:
@@ -825,6 +888,59 @@ components:
       required:
         - content
         - pagination
+
+    # === Widget ===
+
+    WidgetSettingsResponse:
+      type: object
+      properties:
+        accentColor:
+          type: string
+          example: "#7B5BFF"
+        position:
+          type: string
+          enum: [bottom-right, bottom-left]
+        title:
+          type: string
+          example: "Asystent"
+        greeting:
+          type: string
+        placeholder:
+          type: string
+        isActive:
+          type: boolean
+      required: [accentColor, position, title, greeting, placeholder, isActive]
+
+    WidgetSettingsRequest:
+      type: object
+      properties:
+        accentColor:
+          type: string
+          pattern: '^#[0-9A-Fa-f]{6}$'
+        position:
+          type: string
+          enum: [bottom-right, bottom-left]
+        title:
+          type: string
+          maxLength: 60
+        greeting:
+          type: string
+        placeholder:
+          type: string
+          maxLength: 80
+        isActive:
+          type: boolean
+      required: [accentColor, position, title, greeting, placeholder, isActive]
+
+    WidgetAdminConfigResponse:
+      type: object
+      properties:
+        publicKey:
+          type: string
+          example: "pk_widget_live_a1b2c3d4"
+        settings:
+          $ref: '#/components/schemas/WidgetSettingsResponse'
+      required: [publicKey, settings]
 
     # === Admin ===
 

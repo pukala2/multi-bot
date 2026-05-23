@@ -2,21 +2,16 @@ package com.multibot.admin.application;
 
 import com.multibot.admin.domain.model.AdminStats;
 import com.multibot.admin.domain.port.in.GetAdminStatsUseCase;
-import com.multibot.shared.tenant.TenantId;
+import com.multibot.admin.domain.port.out.AdminStatsRepository;
 import com.multibot.tenancy.TenantContext;
-import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.ZoneOffset;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -24,100 +19,56 @@ class AdminStatsService implements GetAdminStatsUseCase {
 
     private static final double COST_PER_TOKEN_USD = 0.000005;
 
-    private final JdbcTemplate jdbc;
+    private final AdminStatsRepository repository;
 
-    AdminStatsService(JdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    AdminStatsService(AdminStatsRepository repository) {
+        this.repository = repository;
     }
 
     @Override
     @Transactional(readOnly = true)
     public AdminStats getStats() {
         UUID tenantId = TenantContext.get().value();
-        Timestamp startOfToday = startOfDay(0);
-        Timestamp startOfWeek = startOfDay(7);
+        Instant startOfToday = startOfDay(0);
+        Instant startOfWeek = startOfDay(7);
 
         return new AdminStats(
                 documentStats(tenantId),
                 sessionStats(tenantId, startOfToday, startOfWeek),
                 messageStats(tenantId, startOfToday),
                 tokenStats(tenantId, startOfToday),
-                lastActivity(tenantId));
+                repository.findLastActivity(tenantId));
     }
 
     private AdminStats.DocumentStats documentStats(UUID tenantId) {
-        Long total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM documents WHERE tenant_id = ?",
-                Long.class, tenantId);
-        Map<String, Long> byStatus = new HashMap<>();
-        for (String status : new String[]{"PENDING", "PROCESSING", "READY", "FAILED"}) {
-            byStatus.put(status, 0L);
-        }
-        jdbc.query(
-                "SELECT status, COUNT(*) FROM documents WHERE tenant_id = ? GROUP BY status",
-                rs -> { byStatus.put(rs.getString(1), rs.getLong(2)); },
-                tenantId);
-        return new AdminStats.DocumentStats(total != null ? total : 0L, byStatus);
+        return new AdminStats.DocumentStats(
+                repository.countDocuments(tenantId),
+                repository.countDocumentsByStatus(tenantId));
     }
 
-    private AdminStats.SessionStats sessionStats(UUID tenantId, Timestamp today, Timestamp week) {
-        Long total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM chat_sessions WHERE tenant_id = ?",
-                Long.class, tenantId);
-        Long todayCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM chat_sessions WHERE tenant_id = ? AND started_at >= ?",
-                Long.class, tenantId, today);
-        Long weekCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM chat_sessions WHERE tenant_id = ? AND started_at >= ?",
-                Long.class, tenantId, week);
+    private AdminStats.SessionStats sessionStats(UUID tenantId, Instant today, Instant week) {
         return new AdminStats.SessionStats(
-                nullToZero(total), nullToZero(todayCount), nullToZero(weekCount));
+                repository.countSessions(tenantId),
+                repository.countSessionsSince(tenantId, today),
+                repository.countSessionsSince(tenantId, week));
     }
 
-    private AdminStats.MessageStats messageStats(UUID tenantId, Timestamp today) {
-        Long total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM messages WHERE tenant_id = ?",
-                Long.class, tenantId);
-        Long todayCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM messages WHERE tenant_id = ? AND created_at >= ?",
-                Long.class, tenantId, today);
-        return new AdminStats.MessageStats(nullToZero(total), nullToZero(todayCount));
+    private AdminStats.MessageStats messageStats(UUID tenantId, Instant today) {
+        return new AdminStats.MessageStats(
+                repository.countMessages(tenantId),
+                repository.countMessagesSince(tenantId, today));
     }
 
-    private AdminStats.TokenStats tokenStats(UUID tenantId, Timestamp today) {
-        Long total = jdbc.queryForObject(
-                "SELECT COALESCE(SUM(tokens_used), 0) FROM messages WHERE tenant_id = ? AND tokens_used IS NOT NULL",
-                Long.class, tenantId);
-        Long todayCount = jdbc.queryForObject(
-                "SELECT COALESCE(SUM(tokens_used), 0) FROM messages WHERE tenant_id = ? AND tokens_used IS NOT NULL AND created_at >= ?",
-                Long.class, tenantId, today);
-        long totalTokens = nullToZero(total);
-        long todayTokens = nullToZero(todayCount);
-        double estimatedCost = todayTokens * COST_PER_TOKEN_USD;
-        return new AdminStats.TokenStats(totalTokens, todayTokens, round4(estimatedCost));
+    private AdminStats.TokenStats tokenStats(UUID tenantId, Instant today) {
+        long total = repository.sumTokens(tenantId);
+        long todayTokens = repository.sumTokensSince(tenantId, today);
+        double estimatedCost = round4(todayTokens * COST_PER_TOKEN_USD);
+        return new AdminStats.TokenStats(total, todayTokens, estimatedCost);
     }
 
-    private Optional<Instant> lastActivity(UUID tenantId) {
-        Timestamp ts = jdbc.queryForObject(
-                """
-                SELECT MAX(activity) AS activity FROM (
-                  SELECT MAX(uploaded_at) AS activity FROM documents WHERE tenant_id = ?
-                  UNION ALL
-                  SELECT MAX(last_activity_at) AS activity FROM chat_sessions WHERE tenant_id = ?
-                ) AS combined
-                """,
-                Timestamp.class, tenantId, tenantId);
-        return Optional.ofNullable(ts).map(Timestamp::toInstant);
-    }
-
-    private static Timestamp startOfDay(int daysAgo) {
+    private static Instant startOfDay(int daysAgo) {
         LocalDate date = LocalDate.now(ZoneOffset.UTC).minusDays(daysAgo);
-        LocalDateTime midnight = LocalDateTime.of(date, LocalTime.MIDNIGHT);
-        return Timestamp.from(midnight.toInstant(ZoneOffset.UTC));
-    }
-
-    private static long nullToZero(Long v) {
-        return v != null ? v : 0L;
+        return LocalDateTime.of(date, LocalTime.MIDNIGHT).toInstant(ZoneOffset.UTC);
     }
 
     private static double round4(double v) {

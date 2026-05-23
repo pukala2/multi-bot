@@ -153,6 +153,47 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/widget": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pobierz konfigurację widgetu (operator)
+         * @description Zwraca publishable key + settings widgetu dla aktualnego tenanta.
+         */
+        get: operations["getWidgetAdminConfig"];
+        /** Zaktualizuj settings widgetu */
+        put: operations["updateWidgetSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/widget/config": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Publiczna konfiguracja widgetu po kluczu
+         * @description Endpoint wywoływany przez widget na stronie klienta przy pierwszym ładowaniu.
+         */
+        get: operations["getWidgetPublicConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/stats": {
         parameters: {
             query?: never;
@@ -478,6 +519,31 @@ export interface components {
         PaginatedMessageResponse: {
             content: components["schemas"]["MessageResponse"][];
             pagination: components["schemas"]["PageMetadata"];
+        };
+        WidgetSettingsResponse: {
+            /** @example #7B5BFF */
+            accentColor: string;
+            /** @enum {string} */
+            position: "bottom-right" | "bottom-left";
+            /** @example Asystent */
+            title: string;
+            greeting: string;
+            placeholder: string;
+            isActive: boolean;
+        };
+        WidgetSettingsRequest: {
+            accentColor: string;
+            /** @enum {string} */
+            position: "bottom-right" | "bottom-left";
+            title: string;
+            greeting: string;
+            placeholder: string;
+            isActive: boolean;
+        };
+        WidgetAdminConfigResponse: {
+            /** @example pk_widget_live_a1b2c3d4 */
+            publicKey: string;
+            settings: components["schemas"]["WidgetSettingsResponse"];
         };
         AdminStatsResponse: {
             documents: components["schemas"]["DocumentStats"];
@@ -913,6 +979,77 @@ export interface operations {
             400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
             500: components["responses"]["InternalServerError"];
+        };
+    };
+    getWidgetAdminConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetAdminConfigResponse"];
+                };
+            };
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    updateWidgetSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WidgetSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Zapisane */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetSettingsResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getWidgetPublicConfig: {
+        parameters: {
+            query: {
+                /** @example pk_widget_live_a1b2c3d4 */
+                key: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Settings widgetu */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetSettingsResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     getAdminStats: {

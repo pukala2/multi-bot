@@ -7,6 +7,7 @@ import { DocumentsPage } from '@/pages/DocumentsPage';
 import { ChatPage } from '@/pages/ChatPage';
 import { SessionsPage } from '@/pages/SessionsPage';
 import { SessionDetailPage } from '@/pages/SessionDetailPage';
+import { WidgetPage } from '@/pages/WidgetPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 
 const queryClient = new QueryClient({
@@ -30,6 +31,7 @@ export default function App() {
             <Route path="/chat" element={<ChatPage />} />
             <Route path="/sessions" element={<SessionsPage />} />
             <Route path="/sessions/:id" element={<SessionDetailPage />} />
+            <Route path="/widget" element={<WidgetPage />} />
             <Route
               path="/settings"
               element={
