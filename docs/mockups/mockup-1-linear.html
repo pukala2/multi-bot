@@ -1,0 +1,319 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Multibot Admin · Kierunek 1: Linear-style</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-base: #08090A;
+    --bg-panel: #111213;
+    --bg-elevated: #18191B;
+    --border: #1F2024;
+    --border-strong: #2A2C30;
+    --text: #E6E6E6;
+    --text-muted: #A0A0A8;
+    --text-dim: #6E6E76;
+    --accent: #7B5BFF;
+    --accent-hover: #8E70FF;
+    --accent-glow: rgba(123, 91, 255, 0.15);
+    --success: #4ADE80;
+    --warning: #FBBF24;
+    --error: #F87171;
+    --info: #60A5FA;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-base);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+
+  /* Sidebar */
+  .sidebar {
+    background: var(--bg-panel);
+    border-right: 1px solid var(--border);
+    padding: 20px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+  .logo { display: flex; align-items: center; gap: 10px; padding: 8px 12px 20px; }
+  .logo-icon {
+    width: 28px; height: 28px;
+    background: linear-gradient(135deg, var(--accent), #5B7CFF);
+    border-radius: 8px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 700; color: white; font-size: 14px;
+  }
+  .logo-name { font-weight: 600; font-size: 15px; }
+  .nav-section { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; padding: 16px 12px 8px; font-weight: 600; }
+  .nav-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 12px;
+    border-radius: 6px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.15s;
+    font-size: 13.5px;
+  }
+  .nav-item:hover { background: var(--bg-elevated); color: var(--text); }
+  .nav-item.active { background: var(--bg-elevated); color: var(--text); }
+  .nav-item.active::before { content: ''; width: 3px; height: 16px; background: var(--accent); border-radius: 2px; margin-left: -12px; margin-right: 9px; }
+  .nav-icon { width: 16px; height: 16px; opacity: 0.7; }
+
+  /* Main */
+  .main { padding: 24px 32px; max-width: 1400px; width: 100%; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; }
+  .page-title { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+  .topbar-actions { display: flex; gap: 8px; align-items: center; }
+  .search {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    padding: 7px 12px 7px 32px;
+    color: var(--text);
+    font-size: 13px;
+    width: 280px;
+    font-family: inherit;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23A0A0A8' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 10px center;
+  }
+  .search:focus { outline: none; border-color: var(--accent); }
+
+  /* Stat tiles */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 32px; }
+  .stat {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 18px 20px;
+    transition: border-color 0.15s;
+  }
+  .stat:hover { border-color: var(--border-strong); }
+  .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+  .stat-value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; }
+  .stat-delta { font-size: 11px; margin-top: 6px; color: var(--success); }
+  .stat-delta.down { color: var(--error); }
+
+  /* Card */
+  .card {
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .card-title { font-size: 14px; font-weight: 600; }
+  .btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 7px 14px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 500;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .btn:hover { background: var(--accent-hover); }
+  .btn-secondary { background: transparent; border: 1px solid var(--border-strong); color: var(--text); }
+  .btn-secondary:hover { background: var(--bg-elevated); }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 12px 20px; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; background: var(--bg-elevated); }
+  td { padding: 14px 20px; border-top: 1px solid var(--border); font-size: 13px; }
+  td.mono { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--text-muted); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 11px; font-weight: 500;
+  }
+  .badge-success { background: rgba(74, 222, 128, 0.12); color: var(--success); }
+  .badge-warning { background: rgba(251, 191, 36, 0.12); color: var(--warning); }
+  .badge-error { background: rgba(248, 113, 113, 0.12); color: var(--error); }
+  .badge-info { background: rgba(96, 165, 250, 0.12); color: var(--info); }
+  .badge-dot { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+  .grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-top: 24px; }
+
+  /* Chat preview */
+  .chat-msg { padding: 10px 14px; border-radius: 8px; margin-bottom: 8px; font-size: 13px; }
+  .chat-msg.user { background: var(--bg-elevated); margin-left: 40px; }
+  .chat-msg.assistant { background: rgba(123, 91, 255, 0.08); border-left: 2px solid var(--accent); margin-right: 40px; }
+  .chat-msg-role { font-size: 10.5px; color: var(--text-dim); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+
+  /* Style banner */
+  .style-banner { background: var(--bg-elevated); padding: 8px 32px; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .style-banner strong { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="style-banner">
+  <span>📐 <strong>Kierunek 1: Linear-style</strong> · czyste tło #08090A · accent violet #7B5BFF · Inter + JetBrains Mono</span>
+  <span class="mono">mockup-1-linear.html</span>
+</div>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">M</div>
+      <div class="logo-name">Multibot</div>
+    </div>
+
+    <div class="nav-section">Główne</div>
+    <div class="nav-item active">📊 Dashboard</div>
+    <div class="nav-item">📄 Documents</div>
+    <div class="nav-item">💬 Chat Playground</div>
+    <div class="nav-item">🗂 Sessions</div>
+
+    <div class="nav-section">System</div>
+    <div class="nav-item">⚙️ Settings</div>
+    <div class="nav-item">📈 Analytics</div>
+
+    <div style="margin-top: auto; padding: 12px; font-size: 11px; color: var(--text-dim);" class="mono">
+      tenant: 00000000-…-0001<br/>
+      v0.1.0 · main
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h1 class="page-title">Dashboard</h1>
+      <div class="topbar-actions">
+        <input type="text" placeholder="Search anything…" class="search" />
+        <button class="btn-secondary btn">+ Upload</button>
+        <button class="btn">New session</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Documents</div>
+        <div class="stat-value">3</div>
+        <div class="stat-delta">↑ 2 this week</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Sessions today</div>
+        <div class="stat-value">12</div>
+        <div class="stat-delta">↑ 40%</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Tokens used</div>
+        <div class="stat-value">8,472</div>
+        <div class="stat-delta">~$0.04</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Avg response time</div>
+        <div class="stat-value">1.4s</div>
+        <div class="stat-delta down">↑ 0.2s</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div class="card-title">Documents</div>
+        <button class="btn">+ Upload file</button>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Filename</th><th>Size</th><th>Status</th><th>Chunks</th><th>Uploaded</th><th>ID</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>kosmotech-faq.txt</td>
+            <td>3.5 KB</td>
+            <td><span class="badge badge-success"><span class="badge-dot"></span>READY</span></td>
+            <td>3</td>
+            <td>2 hours ago</td>
+            <td class="mono">019e5431…660b</td>
+          </tr>
+          <tr>
+            <td>kosmotech-regulamin.txt</td>
+            <td>4.4 KB</td>
+            <td><span class="badge badge-success"><span class="badge-dot"></span>READY</span></td>
+            <td>3</td>
+            <td>3 hours ago</td>
+            <td class="mono">019e5505…0627</td>
+          </tr>
+          <tr>
+            <td>kosmotech-produkty.md</td>
+            <td>2.3 KB</td>
+            <td><span class="badge badge-warning"><span class="badge-dot"></span>PROCESSING</span></td>
+            <td>—</td>
+            <td>just now</td>
+            <td class="mono">019e5506…0515</td>
+          </tr>
+          <tr>
+            <td>internal-notes.pdf</td>
+            <td>128 KB</td>
+            <td><span class="badge badge-error"><span class="badge-dot"></span>FAILED</span></td>
+            <td>—</td>
+            <td>yesterday</td>
+            <td class="mono">019e5400…aabb</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header"><div class="card-title">Chat Playground</div></div>
+        <div style="padding: 16px 20px;">
+          <div class="chat-msg user">
+            <div class="chat-msg-role">User</div>
+            Ile kosztuje jeden Kosmiczny Pomidor Classic?
+          </div>
+          <div class="chat-msg assistant">
+            <div class="chat-msg-role">Assistant</div>
+            Jeden Kosmiczny Pomidor Classic (Tomatum Cosmicum Classic) kosztuje <strong>47,00 zł</strong> [4].
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 12px;">
+            <input class="search" style="flex: 1; background-position: 10px center;" placeholder="Zadaj pytanie..." />
+            <button class="btn">Send</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header"><div class="card-title">Recent sources</div></div>
+        <div style="padding: 14px 20px;">
+          <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px; padding: 10px 12px; background: var(--bg-elevated); border-radius: 6px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span style="color: var(--text);">kosmotech-produkty.md</span>
+              <span class="badge badge-info" style="font-size: 10px;">0.629</span>
+            </div>
+            <div style="font-size: 11px;">Cena: 47,00 zł / sztuka. Waga: 27,3 g (± 1,2 g)…</div>
+          </div>
+          <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 12px; padding: 10px 12px; background: var(--bg-elevated); border-radius: 6px;">
+            <div style="display: flex; justify-content: space-between; margin-bottom: 4px;">
+              <span style="color: var(--text);">kosmotech-faq.txt</span>
+              <span class="badge badge-info" style="font-size: 10px;">0.596</span>
+            </div>
+            <div style="font-size: 11px;">FAQ - Kosmotech Sp. z o.o. Witamy w bazie wiedzy…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>

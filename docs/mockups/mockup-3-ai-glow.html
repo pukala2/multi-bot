@@ -1,0 +1,407 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Multibot Admin · Kierunek 3: AI-glow</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-base: #0B0612;
+    --bg-panel: rgba(255, 255, 255, 0.025);
+    --bg-elevated: rgba(255, 255, 255, 0.04);
+    --bg-hover: rgba(255, 255, 255, 0.06);
+    --border: rgba(255, 255, 255, 0.08);
+    --border-strong: rgba(255, 255, 255, 0.14);
+    --text: #FAFAFC;
+    --text-muted: #A5A3B8;
+    --text-dim: #6B6884;
+    --accent-from: #8B5CF6;
+    --accent-via: #A78BFA;
+    --accent-to: #22D3EE;
+    --accent-glow: rgba(139, 92, 246, 0.4);
+    --success: #22D3EE;
+    --warning: #FBBF24;
+    --error: #F87171;
+    --info: #A78BFA;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  html, body { overflow-x: hidden; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-base);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+    position: relative;
+  }
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background:
+      radial-gradient(at 0% 0%, rgba(139, 92, 246, 0.18), transparent 50%),
+      radial-gradient(at 100% 0%, rgba(34, 211, 238, 0.12), transparent 50%),
+      radial-gradient(at 100% 100%, rgba(168, 85, 247, 0.1), transparent 50%);
+    pointer-events: none;
+    z-index: 0;
+  }
+  body > * { position: relative; z-index: 1; }
+  .mono { font-family: 'JetBrains Mono', monospace; font-size: 12px; }
+
+  .app { display: grid; grid-template-columns: 250px 1fr; min-height: 100vh; }
+
+  .sidebar {
+    background: rgba(11, 6, 18, 0.5);
+    backdrop-filter: blur(20px);
+    border-right: 1px solid var(--border);
+    padding: 24px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .logo { display: flex; align-items: center; gap: 12px; padding: 8px 12px 28px; }
+  .logo-icon {
+    width: 32px; height: 32px;
+    background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
+    border-radius: 9px;
+    display: flex; align-items: center; justify-content: center;
+    font-weight: 800; color: white; font-size: 15px;
+    box-shadow: 0 0 24px var(--accent-glow);
+  }
+  .logo-name { font-weight: 700; font-size: 16px; letter-spacing: -0.02em;
+    background: linear-gradient(90deg, var(--text) 0%, var(--accent-via) 100%);
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .nav-section { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; padding: 18px 12px 8px; font-weight: 700; }
+  .nav-item {
+    display: flex; align-items: center; gap: 12px;
+    padding: 9px 12px;
+    border-radius: 8px;
+    color: var(--text-muted);
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 13.5px;
+    position: relative;
+  }
+  .nav-item:hover { background: var(--bg-elevated); color: var(--text); }
+  .nav-item.active {
+    background: linear-gradient(90deg, rgba(139, 92, 246, 0.15), rgba(34, 211, 238, 0.05));
+    color: var(--text);
+    border: 1px solid rgba(139, 92, 246, 0.25);
+  }
+  .nav-item.active::after {
+    content: '';
+    position: absolute;
+    left: -1px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 3px;
+    height: 60%;
+    background: linear-gradient(180deg, var(--accent-from), var(--accent-to));
+    border-radius: 0 4px 4px 0;
+  }
+
+  .main { padding: 28px 36px; max-width: 1400px; width: 100%; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 36px; }
+  .page-title {
+    font-size: 28px;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    background: linear-gradient(90deg, var(--text), var(--accent-via));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .topbar-actions { display: flex; gap: 10px; align-items: center; }
+
+  .search {
+    background: var(--bg-panel);
+    backdrop-filter: blur(10px);
+    border: 1px solid var(--border);
+    border-radius: 9px;
+    padding: 9px 14px 9px 36px;
+    color: var(--text);
+    font-size: 13px;
+    width: 280px;
+    font-family: inherit;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%23A5A3B8' stroke-width='2'%3E%3Ccircle cx='11' cy='11' r='8'/%3E%3Cpath d='m21 21-4.3-4.3'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: 12px center;
+    transition: all 0.2s;
+  }
+  .search:focus { outline: none; border-color: var(--accent-from); box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.15); }
+
+  /* Stat tiles */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 36px; }
+  .stat {
+    background: var(--bg-panel);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 22px;
+    transition: all 0.3s;
+    position: relative;
+    overflow: hidden;
+  }
+  .stat::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(135deg, transparent 40%, rgba(139, 92, 246, 0.06));
+    opacity: 0;
+    transition: opacity 0.3s;
+  }
+  .stat:hover { border-color: rgba(139, 92, 246, 0.3); transform: translateY(-2px); box-shadow: 0 10px 40px rgba(139, 92, 246, 0.15); }
+  .stat:hover::before { opacity: 1; }
+  .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 12px; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+  .stat-value {
+    font-size: 36px;
+    font-weight: 800;
+    letter-spacing: -0.04em;
+    background: linear-gradient(135deg, var(--text), var(--accent-via));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  }
+  .stat-meta { font-size: 12px; margin-top: 8px; color: var(--text-dim); }
+  .stat-delta-up { color: var(--accent-to); }
+
+  /* Card */
+  .card {
+    background: var(--bg-panel);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    overflow: hidden;
+  }
+  .card-header {
+    padding: 20px 24px;
+    border-bottom: 1px solid var(--border);
+    display: flex; justify-content: space-between; align-items: center;
+  }
+  .card-title { font-size: 16px; font-weight: 700; letter-spacing: -0.01em; }
+  .card-subtitle { font-size: 12px; color: var(--text-dim); margin-top: 3px; }
+
+  /* AI gradient buttons */
+  .btn {
+    background: linear-gradient(135deg, var(--accent-from), var(--accent-to));
+    color: white;
+    border: none;
+    padding: 9px 18px;
+    border-radius: 9px;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    transition: all 0.2s;
+    box-shadow: 0 4px 20px rgba(139, 92, 246, 0.3);
+    letter-spacing: -0.01em;
+  }
+  .btn:hover { transform: translateY(-1px); box-shadow: 0 6px 28px rgba(139, 92, 246, 0.45); }
+  .btn-secondary { background: var(--bg-elevated); border: 1px solid var(--border-strong); color: var(--text); box-shadow: none; backdrop-filter: blur(10px); }
+  .btn-secondary:hover { background: var(--bg-hover); border-color: rgba(139, 92, 246, 0.3); transform: translateY(-1px); box-shadow: 0 0 16px rgba(139, 92, 246, 0.15); }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 14px 24px; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 1px; font-weight: 700; background: rgba(255,255,255,0.015); border-bottom: 1px solid var(--border); }
+  td { padding: 16px 24px; border-bottom: 1px solid var(--border); font-size: 13.5px; }
+  td.mono { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--text-muted); }
+  tr:last-child td { border-bottom: none; }
+  tr:hover td { background: rgba(139, 92, 246, 0.04); }
+
+  .badge {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 4px 10px;
+    border-radius: 999px;
+    font-size: 11px; font-weight: 600;
+    letter-spacing: 0.3px;
+    border: 1px solid;
+  }
+  .badge-success { background: rgba(34, 211, 238, 0.12); color: var(--success); border-color: rgba(34, 211, 238, 0.35); box-shadow: 0 0 12px rgba(34, 211, 238, 0.1); }
+  .badge-warning { background: rgba(251, 191, 36, 0.12); color: var(--warning); border-color: rgba(251, 191, 36, 0.35); }
+  .badge-error { background: rgba(248, 113, 113, 0.12); color: var(--error); border-color: rgba(248, 113, 113, 0.35); }
+  .badge-info { background: rgba(167, 139, 250, 0.12); color: var(--info); border-color: rgba(167, 139, 250, 0.35); }
+  .badge-dot { width: 5px; height: 5px; border-radius: 50%; background: currentColor; box-shadow: 0 0 6px currentColor; }
+
+  .grid-2 { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-top: 24px; }
+
+  .chat-msg { padding: 12px 16px; border-radius: 12px; margin-bottom: 10px; font-size: 13.5px; }
+  .chat-msg.user { background: var(--bg-elevated); margin-left: 60px; border: 1px solid var(--border); }
+  .chat-msg.assistant {
+    background: linear-gradient(135deg, rgba(139, 92, 246, 0.08), rgba(34, 211, 238, 0.04));
+    margin-right: 60px;
+    border: 1px solid rgba(139, 92, 246, 0.2);
+  }
+  .chat-msg-role { font-size: 10.5px; color: var(--text-dim); margin-bottom: 6px; font-weight: 700; text-transform: uppercase; letter-spacing: 1px; }
+
+  .style-banner { background: rgba(11, 6, 18, 0.7); backdrop-filter: blur(10px); padding: 10px 32px; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .style-banner strong {
+    background: linear-gradient(90deg, var(--accent-from), var(--accent-to));
+    -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+    font-weight: 700;
+  }
+</style>
+</head>
+<body>
+<div class="style-banner">
+  <span>✨ <strong>Kierunek 3: AI-glow</strong> · gradient violet→cyan · glassmorphism · Inter + JetBrains Mono · GLOW EVERYWHERE</span>
+  <span class="mono">mockup-3-ai-glow.html</span>
+</div>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">M</div>
+      <div class="logo-name">Multibot</div>
+    </div>
+
+    <div class="nav-section">Główne</div>
+    <div class="nav-item active">📊 Dashboard</div>
+    <div class="nav-item">📄 Documents</div>
+    <div class="nav-item">💬 Chat Playground</div>
+    <div class="nav-item">🗂 Sessions</div>
+
+    <div class="nav-section">System</div>
+    <div class="nav-item">⚙️ Settings</div>
+    <div class="nav-item">📈 Analytics</div>
+
+    <div style="margin-top: auto; padding: 14px 12px; font-size: 11px; color: var(--text-dim); border-top: 1px solid var(--border);" class="mono">
+      tenant 0000…0001<br/>
+      v0.1.0
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h1 class="page-title">Dashboard</h1>
+      <div class="topbar-actions">
+        <input type="text" placeholder="Search anything…" class="search" />
+        <button class="btn-secondary btn">Upload</button>
+        <button class="btn">+ New session</button>
+      </div>
+    </div>
+
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Documents</div>
+        <div class="stat-value">3</div>
+        <div class="stat-meta"><span class="stat-delta-up">+2</span> this week</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Sessions today</div>
+        <div class="stat-value">12</div>
+        <div class="stat-meta"><span class="stat-delta-up">+40%</span> ↑</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Tokens used</div>
+        <div class="stat-value">8.4K</div>
+        <div class="stat-meta">~$0.04 today</div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Avg latency</div>
+        <div class="stat-value">1.4s</div>
+        <div class="stat-meta">p95: 2.1s</div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Documents</div>
+          <div class="card-subtitle">Manage your knowledge base</div>
+        </div>
+        <button class="btn">+ Upload file</button>
+      </div>
+      <table>
+        <thead>
+          <tr><th>Filename</th><th>Size</th><th>Status</th><th>Chunks</th><th>Uploaded</th><th>ID</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>kosmotech-faq.txt</td>
+            <td>3.5 KB</td>
+            <td><span class="badge badge-success"><span class="badge-dot"></span>READY</span></td>
+            <td>3</td>
+            <td>2 hours ago</td>
+            <td class="mono">019e5431…660b</td>
+          </tr>
+          <tr>
+            <td>kosmotech-regulamin.txt</td>
+            <td>4.4 KB</td>
+            <td><span class="badge badge-success"><span class="badge-dot"></span>READY</span></td>
+            <td>3</td>
+            <td>3 hours ago</td>
+            <td class="mono">019e5505…0627</td>
+          </tr>
+          <tr>
+            <td>kosmotech-produkty.md</td>
+            <td>2.3 KB</td>
+            <td><span class="badge badge-warning"><span class="badge-dot"></span>PROCESSING</span></td>
+            <td>—</td>
+            <td>just now</td>
+            <td class="mono">019e5506…0515</td>
+          </tr>
+          <tr>
+            <td>internal-notes.pdf</td>
+            <td>128 KB</td>
+            <td><span class="badge badge-error"><span class="badge-dot"></span>FAILED</span></td>
+            <td>—</td>
+            <td>yesterday</td>
+            <td class="mono">019e5400…aabb</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Chat Playground</div>
+            <div class="card-subtitle">Test the bot with your knowledge base</div>
+          </div>
+        </div>
+        <div style="padding: 20px 24px;">
+          <div class="chat-msg user">
+            <div class="chat-msg-role">User</div>
+            Ile kosztuje jeden Kosmiczny Pomidor Classic?
+          </div>
+          <div class="chat-msg assistant">
+            <div class="chat-msg-role">✨ Assistant</div>
+            Jeden Kosmiczny Pomidor Classic (Tomatum Cosmicum Classic) kosztuje <strong>47,00 zł</strong> [4].
+          </div>
+          <div style="display: flex; gap: 8px; margin-top: 14px;">
+            <input class="search" style="flex: 1; background-position: 12px center;" placeholder="Ask anything..." />
+            <button class="btn">Send →</button>
+          </div>
+        </div>
+      </div>
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Recent sources</div>
+            <div class="card-subtitle">RAG retrieval</div>
+          </div>
+        </div>
+        <div style="padding: 16px 20px;">
+          <div style="font-size: 12.5px; color: var(--text-muted); margin-bottom: 10px; padding: 12px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="color: var(--text); font-weight: 600;">kosmotech-produkty.md</span>
+              <span class="badge badge-info" style="font-size: 10.5px;">0.629</span>
+            </div>
+            <div style="font-size: 11.5px;">Cena: 47,00 zł / sztuka. Waga: 27,3 g…</div>
+          </div>
+          <div style="font-size: 12.5px; color: var(--text-muted); padding: 12px; background: var(--bg-elevated); border: 1px solid var(--border); border-radius: 10px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+              <span style="color: var(--text); font-weight: 600;">kosmotech-faq.txt</span>
+              <span class="badge badge-info" style="font-size: 10.5px;">0.596</span>
+            </div>
+            <div style="font-size: 11.5px;">FAQ - Kosmotech Sp. z o.o…</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+</body>
+</html>
