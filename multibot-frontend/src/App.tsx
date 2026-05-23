@@ -4,6 +4,7 @@ import { Toaster } from 'sonner';
 import { AppShell } from '@/components/layout/AppShell';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { DocumentsPage } from '@/pages/DocumentsPage';
+import { ChatPage } from '@/pages/ChatPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 
 const queryClient = new QueryClient({
@@ -24,16 +25,7 @@ export default function App() {
           <Route element={<AppShell />}>
             <Route path="/" element={<DashboardPage />} />
             <Route path="/documents" element={<DocumentsPage />} />
-            <Route
-              path="/chat"
-              element={
-                <PlaceholderPage
-                  title="Testowy czat"
-                  phaseLabel="Faza F4"
-                  description="Test bota ze streamingiem SSE, panel źródeł, formatowanie Markdown. W przygotowaniu."
-                />
-              }
-            />
+            <Route path="/chat" element={<ChatPage />} />
             <Route
               path="/sessions"
               element={
