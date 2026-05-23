@@ -1,0 +1,77 @@
+@startuml 12-widget-admin-config
+title GET / PUT /api/admin/widget - konfiguracja widgetu przez operatora
+
+actor "Admin UI\n(/widget)" as UI
+participant "WidgetController" as Ctrl
+participant "WidgetService" as S
+participant "WidgetRepository\n(JdbcAdapter)" as Repo
+database "PostgreSQL" as DB
+
+== GET /api/admin/widget - pobranie aktualnych ustawień ==
+
+UI -> Ctrl: GET /api/admin/widget
+activate Ctrl
+
+Ctrl -> S: getForCurrentTenant()
+activate S
+note over S: TenantContext.get() → tenantId
+
+S -> Repo: findSettings(tenantId)
+Repo -> DB: SELECT * FROM widget_settings WHERE tenant_id=?
+
+alt brak settings dla tego tenanta (np. nowo zarejestrowany)
+  Repo --> S: Optional.empty()
+  S -> Repo: insertSettings(tenantId, WidgetSettings.defaults())
+  Repo -> DB: INSERT widget_settings
+  note over S #LightBlue: defaults():\n#7B5BFF, bottom-right,\n"Asystent", "Cześć! Jak mogę..."
+else settings istnieją
+  Repo --> S: WidgetSettings
+end
+
+S -> Repo: findActiveKey(tenantId)
+Repo -> DB: SELECT key FROM widget_keys\nWHERE tenant_id=? AND is_active=true LIMIT 1
+
+alt brak klucza
+  Repo --> S: Optional.empty()
+  S -> S: generateKey() → "pk_widget_live_HEX8"
+  S -> Repo: insertKey(tenantId, newKey)
+  Repo -> DB: INSERT widget_keys
+else klucz istnieje
+  Repo --> S: existing key
+end
+
+S --> Ctrl: WidgetConfig(key, settings)
+deactivate S
+
+Ctrl --> UI: 200 + {\n  publicKey: "pk_widget_live_...",\n  settings: { accentColor, position, title, greeting, placeholder, isActive }\n}
+deactivate Ctrl
+
+note over UI #LightBlue: WidgetPage:\n- pokazuje snippet z kluczem do skopiowania\n- konfigurator (color picker, position, title...)\n- live preview obok
+
+== PUT /api/admin/widget - zapis zmian ==
+
+UI -> Ctrl: PUT /api/admin/widget\nbody: { accentColor, position, title, greeting, placeholder, isActive }
+activate Ctrl
+
+Ctrl -> S: update(WidgetSettings)
+activate S
+
+note over S #LightYellow: validate():\n- accentColor regex ^#[0-9A-Fa-f]{6}$\n- position in (bottom-right, bottom-left)\n- title max 60, placeholder max 80\n- greeting required
+
+S -> S: findOrCreateSettings(tenantId)\n(zabezpieczenie jak ktoś PUT przed GET)
+S -> Repo: updateSettings(tenantId, settings)
+Repo -> DB: UPDATE widget_settings\nSET accent_color=?, position=?, title=?,\n  greeting=?, placeholder=?, is_active=?,\n  updated_at = NOW()\nWHERE tenant_id=?
+
+S -> Repo: findSettings(tenantId)
+Repo -> DB: SELECT (refresh after update)
+Repo --> S: WidgetSettings
+
+S --> Ctrl: WidgetSettings
+deactivate S
+
+Ctrl --> UI: 200 OK + WidgetSettingsResponse
+deactivate Ctrl
+
+note over UI #LightBlue: TanStack Query invaliduje\n['widget-admin'] → refetch.\nWidget na stronie klienta (mebelki.pl):\nprzy NASTĘPNYM page reload\nfetchuje świeży config (patrz 13)
+
+@enduml

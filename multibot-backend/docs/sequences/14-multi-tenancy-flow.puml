@@ -1,0 +1,78 @@
+@startuml 14-multi-tenancy-flow
+title Multi-tenancy flow — Filter chain → TenantContext → MDC → Hibernate
+
+actor Client as C
+participant "RequestIdFilter\n(HIGHEST_PRECEDENCE)" as RIF
+participant "TenantContextFilter\n(HIGHEST + 10)" as TCF
+participant "TenantResolver\n(Mock w dev, JWT w prod)" as TR
+participant "TenantContext\n(ThreadLocal)" as TC
+participant "MDC\n(SLF4J context)" as MDC
+participant "Controller" as Ctrl
+participant "Service\n(@Transactional)" as Svc
+participant "Hibernate\n(MultiTenantConnectionProvider)" as Hib
+database "PostgreSQL" as DB
+
+C -> RIF: HTTP request\n(może mieć X-Request-Id)
+activate RIF
+note over RIF #LightBlue: Generuje albo czyta\nrequestId (UUID v7)\nMDC.put("requestId", ...)\nResponse header echo
+
+RIF -> TCF: chain.doFilter()
+activate TCF
+
+TCF -> TR: resolve(request)
+note over TR #LightBlue: MockTenantResolver (dev):\nzawsze zwraca DEFAULT_TENANT\n00000000-...-0001\n\nJwtTenantResolver (prod, post-MVP):\nczyta claim "tenantId" z Bearer JWT
+TR --> TCF: Optional<TenantId>
+
+TCF -> TC: TenantContext.set(tenant)
+note over TC: ThreadLocal<TenantId>\nbinding tylko dla tego wątku!
+TCF -> MDC: MDC.put("tenantId", uuid)
+
+TCF -> Ctrl: chain.doFilter()
+activate Ctrl
+
+Ctrl -> Svc: send(command)
+activate Svc
+note over Svc: @Transactional otwiera tx
+
+Svc -> TC: TenantContext.get()
+TC --> Svc: TenantId
+note over Svc: Service używa TenantContext\nbezpośrednio (np. ChatService.start)\nALBO Hibernate sam dodaje filtr
+
+Svc -> Hib: repository.findById(id)
+activate Hib
+
+Hib -> Hib: TenantIdResolver.\nresolveCurrentTenantIdentifier()
+Hib -> TC: TenantContext.get()
+TC --> Hib: TenantId
+
+Hib -> DB: SELECT * FROM messages\nWHERE id = ?\n  AND tenant_id = ?  ← automatycznie dodane!
+note over Hib #LightBlue: HibernateTenancyCustomizer\nrejestruje resolver i\n@TenantId na entitkach\n→ Hibernate AUTOMATYCZNIE\ndodaje warunek do KAŻDEGO query
+
+DB --> Hib: ResultSet (przefiltrowany per tenant)
+Hib --> Svc: Entity
+
+Svc -> Hib: repository.save(newEntity)
+Hib -> DB: INSERT ... tenant_id = ?  ← automatycznie wstawione
+
+Svc --> Ctrl: result
+deactivate Svc
+
+Ctrl --> TCF: response
+deactivate Ctrl
+
+note over TCF #LightYellow: try/finally w filter:\nzawsze clear ThreadLocal!\nInaczej leak między requestami\n(tomcat pooluje wątki)
+
+TCF -> TC: TenantContext.clear()
+TCF -> MDC: MDC.remove("tenantId")
+
+TCF --> RIF: response
+deactivate TCF
+
+note over RIF: finally:\nMDC.clear()
+
+RIF --> C: HTTP response\nX-Request-Id: ...
+deactivate RIF
+
+note over Hib #LightBlue: Async / Reactor scheduler:\nTenantAwareTaskDecorator\n+ ChatService.stream capture-restore\npropagują TenantContext + MDC\nna wątki workerów
+
+@enduml

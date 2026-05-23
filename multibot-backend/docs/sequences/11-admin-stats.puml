@@ -1,0 +1,60 @@
+@startuml 11-admin-stats
+title GET /api/admin/stats - agregacja metryk dla Panel (Dashboard)
+
+actor "Admin UI\n(Panel)" as UI
+participant "AdminStatsController" as Ctrl
+participant "GetAdminStatsUseCase\n(AdminStatsService)" as S
+participant "AdminStatsRepository\n(JdbcAdapter)" as Repo
+database "PostgreSQL" as DB
+
+note over UI #LightBlue: useAdminStats hook:\nrefetchInterval=30s\n(auto-odświeżanie)
+
+UI -> Ctrl: GET /api/admin/stats
+activate Ctrl
+
+Ctrl -> S: getStats()
+activate S
+note over S: TenantContext.get() → tenantId\nstartOfDay(0) → początek dziś (UTC)\nstartOfDay(7) → początek tygodnia
+
+S -> Repo: countDocuments(tenantId)
+Repo -> DB: SELECT COUNT(*) FROM documents WHERE tenant_id=?
+
+S -> Repo: countDocumentsByStatus(tenantId)
+Repo -> DB: SELECT status, COUNT(*) FROM documents\nWHERE tenant_id=? GROUP BY status
+note over Repo #LightBlue: Inicjalizuje mapę z 4 statusami=0,\npotem nadpisuje wynikami GROUP BY\n→ klient zawsze dostaje wszystkie 4 keys
+
+S -> Repo: countSessions(tenantId)
+Repo -> DB: COUNT(*) chat_sessions
+S -> Repo: countSessionsSince(tenantId, startOfToday)
+Repo -> DB: WHERE started_at >= ?
+S -> Repo: countSessionsSince(tenantId, startOfWeek)
+Repo -> DB: WHERE started_at >= ?
+
+S -> Repo: countMessages(tenantId)
+Repo -> DB: COUNT(*) messages
+S -> Repo: countMessagesSince(tenantId, today)
+Repo -> DB: WHERE created_at >= ?
+
+S -> Repo: sumTokens(tenantId)
+Repo -> DB: SUM(tokens_used) FROM messages\nWHERE tokens_used IS NOT NULL
+S -> Repo: sumTokensSince(tenantId, today)
+Repo -> DB: WHERE created_at >= ?
+
+S -> Repo: findLastActivity(tenantId)
+Repo -> DB: SELECT MAX(activity) FROM (\n  SELECT MAX(uploaded_at) FROM documents WHERE tenant_id=?\n  UNION ALL\n  SELECT MAX(last_activity_at) FROM chat_sessions WHERE tenant_id=?\n) AS combined
+Repo --> S: Optional<Instant>
+
+note over S #LightBlue: Cost estimate:\ntodayTokens * 0.000005 USD/token\n(Claude Haiku rough estimate)
+
+S -> S: round4(estimatedCost)
+S -> S: build AdminStats record\n(DocumentStats, SessionStats,\n MessageStats, TokenStats, lastActivity)
+
+S --> Ctrl: AdminStats
+deactivate S
+
+Ctrl --> UI: 200 OK + JSON\n{\n  documents: { total, byStatus: {PENDING, PROCESSING, READY, FAILED} },\n  sessions: { total, today, thisWeek },\n  messages: { total, today },\n  tokens: { total, today, estimatedCostUsd },\n  lastActivity: "2026-05-23T..."\n}
+deactivate Ctrl
+
+note over UI #LightBlue: Stat tiles na Dashboardzie\nz live wartościami:\n- Documents N + status breakdown bar\n- Sessions today/week/total\n- Tokens used + cost estimate\n- Messages today/total
+
+@enduml

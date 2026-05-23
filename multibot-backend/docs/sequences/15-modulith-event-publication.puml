@@ -1,0 +1,65 @@
+@startuml 15-modulith-event-publication
+title Spring Modulith — transactional outbox + event publication
+
+participant "Service A\n(Publisher)" as A
+participant "ApplicationEventPublisher" as AEP
+participant "EventPublicationRegistry\n(Modulith core)" as Reg
+database "event_publication\ntable" as Outbox
+participant "Modulith Event Loop\n(scheduler / sync invoker)" as Loop
+participant "Service B\n(@ApplicationModuleListener)" as B
+participant "Service C\n(@ApplicationModuleListener)" as Cc
+
+== Faza 1: Publikacja w ramach głównej transakcji ==
+
+A -> AEP: publishEvent(SomeDomainEvent)
+activate AEP
+
+AEP -> Reg: capture listeners that will handle this event
+note over Reg #LightBlue: Modulith zna wszystkie\n@ApplicationModuleListener metody\n(skanuje przy starcie)
+
+AEP -> Outbox: INSERT event_publication\n(id, event_type, listener_id,\n serialized_event,\n publication_date, completion_date=NULL)
+note over Outbox: Jeden insert PER listener\n(np. 2 listenery = 2 wiersze)
+
+AEP --> A: return
+deactivate AEP
+
+A -> A: ... reszta kodu ...
+note over A #LightBlue: TRANSAKCJA SIĘ KOŃCZY:\nlub COMMIT (everything saved including events)\nlub ROLLBACK (also events not persisted)\nAtomicity: domain change + event NIGDY się nie rozjeżdżają
+
+== Faza 2: Po commicie — wywołanie listenerów ==
+
+note over Loop #LightBlue: AfterCommit: Modulith odpala\nlistenerów dla świeżo zapisanych eventów
+
+Loop -> Outbox: SELECT * WHERE completion_date IS NULL\nORDER BY publication_date
+Outbox --> Loop: List<EventPublication>
+
+loop dla każdego publication
+  alt @ApplicationModuleListener @Async
+    Loop ->> B: onSomeEvent(event)\n(osobny wątek z TaskDecorator)
+    activate B
+    note over B #LightBlue: TenantAwareTaskDecorator:\nrestore TenantContext + MDC\nz wątku który publikował
+    B -> B: handle (long-running task,\nnp. indexowanie OpenAI)
+    B -> Loop: callback: completed
+    deactivate B
+  else synchronous listener
+    Loop -> Cc: onSomeEvent(event)
+    activate Cc
+    Cc -> Cc: handle
+    Cc --> Loop: return
+    deactivate Cc
+  end
+
+  Loop -> Outbox: UPDATE event_publication\nSET completion_date = NOW()\nWHERE id = ?
+end
+
+note over Outbox: completion_date != NULL\n→ event obsłużony,\nnie zostanie ponowiony
+
+== Failure recovery ==
+
+note over Loop #LightPink: Jeśli listener rzuci wyjątek:\n→ completion_date pozostaje NULL\n→ przy NASTĘPNYM starcie aplikacji\n   (events.republish-outstanding-on-restart=true)\n   Modulith odpala go ponownie
+
+== Use cases w Multibocie ==
+
+note over A #LightYellow: Konkretne flows:\n• DocumentService.upload()\n  → DocumentUploadedEvent\n  → IndexingService.onDocumentUploaded (async)\n\n• IndexingService po skończeniu\n  → IndexingCompletedEvent\n  → DocumentStatusUpdater.onIndexingCompleted (sync)\n\n• DocumentService.delete()\n  → DocumentDeletedEvent\n  → (na razie nikt nie słucha, gotowe na audit/analytics)
+
+@enduml

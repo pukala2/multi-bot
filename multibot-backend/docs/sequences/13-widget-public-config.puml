@@ -1,0 +1,57 @@
+@startuml 13-widget-public-config
+title GET /api/widget/config?key=xxx - publiczny endpoint dla widgetu na stronie klienta
+
+actor "Widget na stronie\nMebelki.pl" as W
+participant "ResourceHandler\n(/widget/embed.js)" as RH
+participant "WidgetController" as Ctrl
+participant "WidgetService" as S
+participant "WidgetRepository" as Repo
+database "PostgreSQL" as DB
+
+note over W #LightBlue: Mebelki ma w HTML:\n<script src="https://multibot.app/widget/embed.js"\n  data-key="pk_widget_live_..."></script>
+
+W -> RH: GET /widget/embed.js
+activate RH
+RH -> W: 22.6 KB JavaScript\nCache-Control: dev=0, prod=1y
+deactivate RH
+
+note over W: Przeglądarka uruchamia embed.js\n→ readBootConfig()\n→ wykrywa data-key
+
+W -> Ctrl: GET /api/widget/config?key=pk_widget_live_...
+note over W #LightBlue: Cross-Origin Request!\nCORS preflight może lecieć pierwszy\n(WebConfig allowedOriginPatterns "*")
+activate Ctrl
+
+Ctrl -> S: getByPublicKey(key)
+activate S
+
+S -> Repo: findTenantIdByActiveKey(key)
+Repo -> DB: SELECT tenant_id FROM widget_keys\nWHERE key = ? AND is_active = true
+
+alt klucz nie istnieje / nieaktywny
+  Repo --> S: Optional.empty()
+  S --> Ctrl: Optional.empty()
+  Ctrl --> W: 404 + ProblemDetail\n"Widget key not found"
+  note over W #LightPink: Widget używa fallback do data-* atrybutów lub DEFAULTS,\nnie blokuje uruchomienia
+else klucz istnieje
+  Repo --> S: UUID (tenant_id)
+
+  S -> Repo: touchKey(key)
+  Repo -> DB: UPDATE widget_keys\nSET last_used_at = NOW()\nWHERE key = ?
+  note over Repo #LightBlue: Tracking ostatniej aktywności\nklucza — w Phase 2 do\nrate limit + analytics
+
+  S -> Repo: findSettings(tenantId)
+  Repo -> DB: SELECT * FROM widget_settings\nWHERE tenant_id = ?
+  Repo --> S: WidgetSettings
+
+  S --> Ctrl: Optional<WidgetSettings>
+end
+deactivate S
+
+Ctrl --> W: 200 OK + {\n  accentColor: "#6B3410",\n  position: "bottom-right",\n  title: "Mebelki Asystent",\n  greeting: "Witam w Mebelki...",\n  placeholder: "Zapytaj o produkt...",\n  isActive: true\n}
+deactivate Ctrl
+
+note over W #LightBlue: Widget renderuje z brandem\nz BE (nie z hardcoded).\nResolveConfig:\n  overrides (data-*) > server > defaults
+
+note over W #LightYellow: Per-tenant ten sam plik embed.js\n— różnią się tylko kluczem i konfiguracją.\nW Phase 2.1 dorzucamy:\n- rate limit per IP\n- token budget per tenant\n- Cloudflare Turnstile
+
+@enduml

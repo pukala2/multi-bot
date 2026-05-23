@@ -1,0 +1,78 @@
+@startuml 07-send-message-blocking
+title POST /api/chat/sessions/{id}/messages — JSON blocking (Accept: application/json)
+
+actor Client as C
+participant "ChatController" as Ctrl
+participant "SendMessageUseCase\n(ChatService)" as CS
+participant "ChatRepository" as CR
+participant "AnswerQuestionUseCase\n(RagService)" as RS
+participant "EmbeddingProvider\n(OpenAI)" as EP
+participant "SearchChunksUseCase\n(VectorService)" as VS
+participant "ChunkStore (PgVector)" as STORE
+participant "PromptBuilder" as PB
+participant "LlmClient (Anthropic)" as LLM
+database "PostgreSQL" as DB
+
+C -> Ctrl: POST /messages\nAccept: application/json\nbody: { content: "Ile kosztuje..." }
+activate Ctrl
+
+Ctrl -> CS: send(SendMessageCommand)
+activate CS
+
+CS -> CR: findSessionById(id)
+CR -> DB: SELECT chat_sessions WHERE id=?
+CR --> CS: ChatSession (lub 404)
+
+CS -> CR: saveMessage(userMessage)\n(role=USER)
+CR -> DB: INSERT messages
+
+note over CS #LightBlue: Wczytaj historię:\nostatnich N=10 wiadomości\n(memoryWindowSize w config)\n→ kontekst dla follow-up pytań
+
+CS -> CR: findRecentMessages(sessionId, 10)
+CR -> DB: SELECT * FROM messages\nWHERE session_id=?\nORDER BY created_at DESC LIMIT 10
+CR --> CS: List<Message>
+
+CS -> RS: answer(RagQuery)\n(question + history + RagOptions)
+activate RS
+
+RS -> EP: embed(question)
+EP -> EP: POST openai/embeddings
+EP --> RS: float[1536]
+
+RS -> VS: search(VectorSearchQuery)\n(topK=5, minScore=0.3)
+activate VS
+VS -> STORE: search(tenantId, embedding, candidateLimit=50)
+STORE -> DB: SELECT chunks, 1 - (embedding <=> ?) AS similarity\nFROM chunks WHERE tenant_id=?\nORDER BY embedding <=> ?\nLIMIT 50
+STORE --> VS: List<VectorSearchResult>
+note over VS #LightBlue: Filter similarity >= 0.3\nlimit topK=5
+VS --> RS: top 5 chunks
+deactivate VS
+
+RS -> PB: build(chunks, history, question)
+note over PB #LightBlue: System prompt PL:\n"Odpowiadaj WYŁĄCZNIE\nna podstawie kontekstu...\nJeśli brak — powiedz że nie wiesz."\n+ chunks jako [1] [2] [3]...\n+ historia rozmowy\n+ aktualne pytanie
+
+RS -> LLM: complete(prompt, temp=0.2, max=1024)
+LLM -> LLM: POST api.anthropic.com\nmodel: claude-haiku-4-5
+LLM --> RS: LlmResponse(text, tokensUsed)
+
+RS -> RS: build citations\n(z chunków z similarity)
+RS --> CS: RagAnswer(text, citations, tokensUsed)
+deactivate RS
+
+CS -> CS: assistantMessage =\n  Message.assistantMessage(\n    tenant, sessionId, answer.text,\n    citations, tokensUsed, now)
+
+CS -> CR: saveMessage(assistantMessage)
+CR -> DB: INSERT messages\n(role=ASSISTANT, content,\n citations, tokens_used)
+
+CS -> CR: saveSession(session.touchedAt(now))
+CR -> DB: UPDATE chat_sessions\nSET last_activity_at=NOW()
+
+CS --> Ctrl: Message (assistant, saved)
+deactivate CS
+
+Ctrl --> C: 200 OK\n{ id, role: "ASSISTANT",\n  content, sources, tokensUsed, createdAt }
+deactivate Ctrl
+
+note over C #LightBlue: Czas total: ~1.5-2s\n(embedding ~200ms,\n search ~50ms,\n LLM ~1-1.5s,\n save ~50ms)
+
+@enduml

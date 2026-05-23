@@ -1,0 +1,38 @@
+@startuml 09-list-sessions
+title GET /api/chat/sessions - lista sesji (operator widzi rozmowy)
+
+actor "Admin UI\n(/sessions)" as UI
+participant "ChatController" as Ctrl
+participant "ListSessionsUseCase\n(ChatService)" as CS
+participant "ChatRepository" as CR
+database "PostgreSQL" as DB
+
+UI -> Ctrl: GET /api/chat/sessions?page=0&size=20&sort=lastActivityAt,desc
+activate Ctrl
+
+Ctrl -> CS: list(Pageable)
+activate CS
+CS -> CR: findAllSessions(pageable)
+CR -> DB: SELECT id, tenant_id, anonymous_id,\n  external_id, started_at, last_activity_at,\n  metadata\nFROM chat_sessions\nWHERE tenant_id = ?\nORDER BY last_activity_at DESC\nLIMIT 20
+note over DB #LightBlue: Multi-tenant isolation\nprzez Hibernate @TenantId
+
+CR --> CS: Page<ChatSession>
+deactivate CS
+
+loop dla każdej sesji
+  Ctrl -> CS: countMessages(sessionId)
+  CS -> CR: countMessages
+  CR -> DB: SELECT COUNT(*) FROM messages\nWHERE session_id = ? AND tenant_id = ?
+  CR --> CS: long
+  CS --> Ctrl: count
+end
+note over Ctrl #LightYellow: N+1 problem dla MVP\n(20 sesji = 21 queries).\nPost-MVP: subquery w 1 SELECT.
+
+Ctrl -> Ctrl: ChatApiMapper.toPaginatedSessions
+
+Ctrl --> UI: 200 + {\n  content: [\n    {id, anonymousId, startedAt, lastActivityAt,\n     messageCount, metadata}\n  ],\n  pagination: {...}\n}
+deactivate Ctrl
+
+note over UI #LightBlue: Klikalność wiersza →\nnawigacja do /sessions/:id\n(patrz 10-session-history)
+
+@enduml

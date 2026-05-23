@@ -1,0 +1,60 @@
+@startuml 01-upload-document
+title POST /api/documents - synchroniczna część (upload + zapis + event)
+
+actor Client as C
+participant "RequestIdFilter" as RIF
+participant "TenantContextFilter" as TCF
+participant "DocumentController" as Ctrl
+participant "DocumentUploadValidator" as V
+participant "DocumentService" as DS
+participant "StoreFileUseCase" as SF
+participant "DocumentRepository" as DR
+participant "ApplicationEventPublisher" as AEP
+database "PostgreSQL" as DB
+
+C -> RIF: POST /api/documents\n(multipart: file=plik.pdf)
+activate RIF
+note over RIF #LightBlue: Generuje albo czyta\nX-Request-Id, wstawia\ndo MDC
+
+RIF -> TCF: chain.doFilter()
+activate TCF
+note over TCF #LightBlue: Resolver wybiera tenant\n(mock w dev → DEFAULT_TENANT)\nUstawia w TenantContext + MDC
+
+TCF -> Ctrl: uploadDocument(file)
+activate Ctrl
+
+Ctrl -> V: validate(filename, mimeType)
+note over V #LightYellow: Whitelist:\n.pdf .docx .txt .md\nOdrzuca .exe etc → 400
+
+Ctrl -> DS: upload(UploadDocumentCommand)
+activate DS
+
+DS -> SF: store(StoreFileCommand)
+SF -> DB: INSERT stored_files
+note over SF #LightBlue: Plik zapisany\n(local storage albo S3)\nzwraca StoredFileId
+
+DS -> DR: save(Document)\n(status=PENDING)
+DR -> DB: INSERT documents
+
+DS -> AEP: publishEvent(DocumentUploadedEvent)
+note over AEP #LightBlue: Modulith outbox:\nzapisuje event do tabeli\nevent_publication\nw TEJ SAMEJ transakcji
+
+AEP -> DB: INSERT event_publication
+note over DB: COMMIT — wszystko\nlub nic (atomicity)
+
+DS --> Ctrl: Document (z UUID v7)
+deactivate DS
+
+Ctrl --> TCF: 202 Accepted\nLocation: /api/documents/{id}
+deactivate Ctrl
+
+TCF --> RIF: response
+deactivate TCF
+note over TCF #LightBlue: finally:\nTenantContext.clear()\nMDC.remove(tenantId)
+
+RIF --> C: HTTP 202\n+ X-Request-Id header
+deactivate RIF
+
+note over C #LightYellow: Klient dostaje status=PENDING.\nIndeksowanie idzie w tle\n(patrz 02-indexing-pipeline)
+
+@enduml

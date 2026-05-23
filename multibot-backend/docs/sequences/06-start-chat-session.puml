@@ -1,0 +1,38 @@
+@startuml 06-start-chat-session
+title POST /api/chat/sessions - utworzenie nowej sesji czatu
+
+actor Client as C
+participant "ChatController" as Ctrl
+participant "StartSessionUseCase\n(ChatService)" as CS
+participant "ChatRepository" as CR
+database "PostgreSQL" as DB
+
+C -> Ctrl: POST /api/chat/sessions\nbody: {}\n(lub z anonymousId/externalId/metadata)
+activate Ctrl
+
+note over Ctrl #LightBlue: Wszystkie 3 pola opcjonalne:\nanonymousId, externalId, metadata\nPusty {} = anonimowa sesja
+
+Ctrl -> Ctrl: toCommand(request)\n→ StartSessionCommand
+
+Ctrl -> CS: start(command)
+activate CS
+
+note over CS #LightBlue: EndUserIdentity logika:\n- jeśli externalId → withExternal()\n- jeśli anonymousId → anonymous(id)\n- jeśli nic → anonymous() (generuje UUID v7)\n  prefiks "anon-019e..."
+
+CS -> CS: ChatSession.startedNow(\n  id = UuidGenerator.newUuidV7(),\n  tenant = TenantContext.get(),\n  endUser, metadata, now)
+
+CS -> CR: saveSession(session)
+CR -> DB: INSERT INTO chat_sessions\n(id, tenant_id, anonymous_id, external_id,\n started_at, last_activity_at, metadata)
+CR --> CS: ChatSession (saved)
+
+CS --> Ctrl: ChatSession
+deactivate CS
+
+Ctrl -> Ctrl: ChatApiMapper.toResponse(session)\n+ Location header
+
+Ctrl --> C: 201 Created\nLocation: /api/chat/sessions/{id}\nbody: {\n  id, anonymousId, startedAt,\n  lastActivityAt, metadata\n}
+deactivate Ctrl
+
+note over C #LightBlue: Frontend (admin /chat) trzyma\nsessionId w useState i używa\nw kolejnych POST messages.\n\nWidget zachowuje się tak samo —\nutworzona sesja żyje do zamknięcia karty.
+
+@enduml

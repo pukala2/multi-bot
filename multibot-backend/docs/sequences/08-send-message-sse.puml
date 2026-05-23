@@ -1,0 +1,77 @@
+@startuml 08-send-message-sse
+title POST /messages — SSE streaming (Accept: text/event-stream)
+
+actor Client as C
+participant "ChatController\n@PostMapping SSE" as Ctrl
+participant "StreamMessageUseCase\n(ChatService)" as CS
+participant "RagService.streamAnswer" as RS
+participant "LlmClient.stream\n(Anthropic + Reactor)" as LLM
+participant "SseEmitter\n(Spring servlet)" as SSE
+participant "ChatRepository" as CR
+database "PostgreSQL" as DB
+
+C -> Ctrl: POST /messages\nAccept: text/event-stream\nbody: { content: "..." }
+activate Ctrl
+
+note over Ctrl #LightBlue: produces=text/event-stream\nconsumes=application/json\nKontroler wraca SseEmitter\n(timeout 60s)
+
+Ctrl -> CS: stream(SendMessageCommand)
+activate CS
+note over CS: Capture: TenantContext + MDC\nbo onComplete/onError\nlecą na Reactor scheduler\n(inny wątek)
+
+CS -> CR: saveMessage(userMessage)\n(synchronicznie, jak w blocking)
+CR -> DB: INSERT messages role=USER
+
+CS -> CS: load history (10 last messages)
+
+CS -> RS: streamAnswer(RagQuery)
+activate RS
+note over RS: Embedding + vector search\nIDENTYCZNIE jak blocking\n(patrz 07-send-message-blocking)\nDIFFERENCE: zwraca Flux<String>\nzamiast LlmResponse
+
+RS -> LLM: stream(prompt, temp, max)
+LLM --> RS: Flux<String> (tokens)
+RS --> CS: StreamingRagAnswer(\n  tokens: Flux<String>,\n  citations,\n  onComplete: (text, tokens) -> {save msg},\n  onError: (throwable) -> {save error}\n)
+deactivate RS
+
+CS --> Ctrl: StreamingRagAnswer
+deactivate CS
+
+Ctrl -> SSE: new SseEmitter(60000)
+activate SSE
+
+Ctrl -> Ctrl: streaming.tokens().subscribe(\n  onChunk,\n  onError,\n  onComplete)
+note over Ctrl #LightBlue: Subskrypcja na Reactor Flux\n→ callbacki lecą na osobnym wątku
+
+loop dla każdego tokena z LLM
+  LLM ->> Ctrl: emit token
+  Ctrl -> SSE: emitter.send(event: "chunk",\n  data: {"text": "Tomatum"})
+  SSE ->> C: event:chunk\ndata:{"text":"Tomatum"}
+  note over C: Frontend (fetch-event-source)\nparsuje event:chunk\n→ appenduje do streamingText
+end
+
+LLM ->> Ctrl: onComplete()
+
+Ctrl -> CS: onComplete(fullText, tokensUsed)
+activate CS
+note over CS #LightBlue: Restore TenantContext + MDC\n(z capture)\nbo Hibernate wymaga\nTenantId żeby zapisać msg
+CS -> CR: saveMessage(assistantMessage,\n citations, tokensUsed)
+CR -> DB: INSERT messages role=ASSISTANT
+CS -> CR: saveSession.touchedAt(now)
+CR -> DB: UPDATE chat_sessions
+deactivate CS
+
+Ctrl -> SSE: emitter.send(event: "sources",\n  data: { sources: [...] })
+SSE ->> C: event:sources\ndata:{"sources":[{filename,score,snippet}]}
+
+Ctrl -> SSE: emitter.send(event: "done",\n  data: { messageId, tokensUsed })
+SSE ->> C: event:done\ndata:{"messageId":"019e...","tokensUsed":287}
+
+Ctrl -> SSE: emitter.complete()
+SSE ->> C: connection close
+deactivate SSE
+
+deactivate Ctrl
+
+note over C #LightPink: Jeśli error w LLM lub network drop:\n→ event:error data:{message, code}\n→ saveMessage z błędem\n→ TenantContext.clear() + MDC.clear()
+
+@enduml

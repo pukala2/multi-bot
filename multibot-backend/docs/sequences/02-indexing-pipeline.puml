@@ -1,0 +1,79 @@
+@startuml 02-indexing-pipeline
+title Background — Indexing pipeline po DocumentUploadedEvent
+
+participant "Event Publication\nRegistry (Modulith)" as Reg
+participant "DocumentUploadedEvent\nListener" as L
+participant "IndexingService" as IS
+participant "FileRetriever" as FR
+participant "TextExtractor\n(Apache Tika)" as TIKA
+participant "TextChunker" as CH
+participant "EmbeddingProvider\n(OpenAI)" as EP
+participant "ChunkStore\n(PgVector adapter)" as CS
+participant "DocumentStatusUpdater" as DSU
+database "PostgreSQL\n+ pgvector" as DB
+
+note over Reg #LightBlue: Po commicie poprzedniej tx\nModulith odpala listenery\nz tabeli event_publication
+
+Reg -> L: onDocumentUploaded(event)
+activate L
+note over L: @ApplicationModuleListener\n@Async — leci na osobnym wątku\n(TenantAwareTaskDecorator\nkopiuje TenantContext + MDC)
+
+L -> IS: index(documentId)
+activate IS
+
+IS -> DB: SELECT documents\nWHERE id = ?
+note over IS #LightBlue: 3-warstwowa idempotency:\n1. status check\n2. usuń stare chunki\n3. atomowa transition\nPENDING → PROCESSING
+
+IS -> IS: markAsProcessing(id)
+IS -> DB: UPDATE documents\nSET status=PROCESSING
+
+IS -> FR: retrieve(storedFileId)
+FR -> DB: SELECT stored_files
+FR --> IS: byte[] content
+
+IS -> TIKA: extract(bytes, mimeType)
+note over TIKA: Tika rozpoznaje PDF/DOCX/MD/TXT\nzwraca plain text + metadata
+
+TIKA --> IS: plainText (np. 12 KB)
+
+IS -> CH: chunk(text, chunkSize=500, overlap=50)
+note over CH: Sliding window:\n500 znaków na chunk,\n50 znaków overlap\n→ N chunków
+
+CH --> IS: List<TextChunk>
+
+loop dla każdego chunka
+  IS -> EP: embed(chunk.text)
+  EP -> EP: HTTPS POST\napi.openai.com/embeddings
+  note over EP #LightYellow: Model:\ntext-embedding-3-small\n1536 dim, batch=1 dla MVP\nKoszt: ~$0.00002 / 1K tokens
+  EP --> IS: float[1536]
+end
+
+IS -> CS: storeAll(chunks)
+activate CS
+CS -> DB: INSERT INTO chunks\n(id, tenant_id, document_id,\nchunk_index, content, embedding,\nmetadata)
+note over DB #LightBlue: HNSW index na embedding\nautomatycznie zaktualizowany
+CS --> IS: void
+deactivate CS
+
+IS -> IS: indexing job COMPLETED\n(chunks_created=N, duration_ms=X)
+IS -> DB: INSERT indexing_jobs
+
+IS -> Reg: publish IndexingCompletedEvent
+Reg -> DB: INSERT event_publication
+
+deactivate IS
+
+note over Reg #LightBlue: Drugi event w łańcuchu
+
+Reg -> DSU: onIndexingCompleted(event)
+activate DSU
+DSU -> DB: UPDATE documents\nSET status=READY,\n    indexed_at=NOW()
+deactivate DSU
+
+note over DB #LightBlue: outbox cleanup:\noba eventy mają\ncompletion_date != NULL
+
+deactivate L
+
+note over IS #LightPink: Jeśli błąd (Tika exception,\nOpenAI 5xx, timeout):\n→ markAsFailed(error)\n→ status=FAILED\n→ chunk usuwane
+
+@enduml

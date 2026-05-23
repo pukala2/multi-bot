@@ -1,0 +1,55 @@
+@startuml 05-delete-document
+title DELETE /api/documents/{id} - kaskadowe sprzątanie
+
+actor Client as C
+participant "DocumentController" as Ctrl
+participant "DeleteDocumentUseCase\n(DocumentService)" as DS
+participant "DeleteChunksByDocument\nUseCase (VectorService)" as VS
+participant "ChunkStore (PgVector)" as CS
+participant "DocumentRepository" as DR
+participant "DeleteFileUseCase\n(FileService)" as FS
+participant "ApplicationEventPublisher" as AEP
+database "PostgreSQL" as DB
+
+C -> Ctrl: DELETE /api/documents/{id}\nAccept: */*
+activate Ctrl
+
+Ctrl -> DS: delete(DocumentId)
+activate DS
+
+DS -> DR: findById(id)
+DR -> DB: SELECT * FROM documents WHERE id=? AND tenant_id=?
+DR --> DS: Document (lub throw NotFound → 404)
+
+note over DS #LightBlue: Kolejność ważna:\nNAJPIERW chunki, POTEM document,\nNA KONIEC fizyczny plik
+
+DS -> VS: deleteByDocument(documentId)
+activate VS
+VS -> CS: deleteByDocument(tenantId, docId)
+CS -> DB: DELETE FROM chunks\nWHERE document_id = ?\n  AND tenant_id = ?
+note over DB #LightBlue: HNSW index automatycznie\nzaktualizowany przy DELETE
+deactivate VS
+
+DS -> DR: deleteById(id)
+DR -> DB: DELETE FROM documents WHERE id=?
+note over DB #LightYellow: FK cascade dla\nindexing_jobs (ON DELETE CASCADE)
+
+DS -> FS: delete(storedFileId)
+activate FS
+FS -> DB: DELETE FROM stored_files WHERE id=?
+note over FS #LightBlue: Local storage: file.delete()\nS3 (post-MVP): DeleteObject API
+deactivate FS
+
+DS -> AEP: publishEvent(DocumentDeletedEvent)
+AEP -> DB: INSERT event_publication
+note over AEP #LightBlue: Inne moduły mogą reagować\n(np. analytics, audit)
+
+DS --> Ctrl: void
+deactivate DS
+
+Ctrl --> C: 204 No Content
+deactivate Ctrl
+
+note over C #LightBlue: Frontend invaliduje\nquery key ['documents']\n→ lista refetchuje\n→ usunięty znika z UI
+
+@enduml

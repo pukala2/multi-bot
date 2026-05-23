@@ -1,0 +1,41 @@
+@startuml 10-session-history
+title GET /api/chat/sessions/{id}/messages - pełna historia rozmowy
+
+actor "Admin UI\n(/sessions/:id)" as UI
+participant "ChatController" as Ctrl
+participant "GetSessionHistoryUseCase\n(ChatService)" as CS
+participant "ChatRepository" as CR
+database "PostgreSQL" as DB
+
+UI -> Ctrl: GET /api/chat/sessions/{id}/messages?\npage=0&size=100&sort=createdAt,asc
+activate Ctrl
+
+Ctrl -> CS: getHistory(sessionId, Pageable)
+activate CS
+
+CS -> CR: findSessionById(id)
+CR -> DB: SELECT chat_sessions\nWHERE id = ? AND tenant_id = ?
+alt sesja nie istnieje
+  CR --> CS: Optional.empty()
+  CS --> Ctrl: throw ChatSessionNotFoundException
+  Ctrl --> UI: 404 + ProblemDetail
+else sesja istnieje
+  CR --> CS: ChatSession
+
+  CS -> CR: findHistory(sessionId, pageable)
+  CR -> DB: SELECT id, role, content, citations,\n  tokens_used, created_at\nFROM messages\nWHERE session_id = ? AND tenant_id = ?\nORDER BY created_at ASC\nLIMIT 100
+  CR --> CS: Page<Message>
+
+  CS --> Ctrl: Page<Message>
+  deactivate CS
+
+  Ctrl -> Ctrl: toPaginatedMessages\n(serializuj citations jako JSON)
+
+  Ctrl --> UI: 200 OK + {\n  content: [\n    {id, role: USER|ASSISTANT, content,\n     citations: [...], tokensUsed, createdAt}\n  ],\n  pagination: {...}\n}
+end
+
+deactivate Ctrl
+
+note over UI #LightBlue: Render: reuse ChatMessage komponentu z /chat\n→ wiadomości user (prawo), bot (lewo + markdown)\nTimestamp + short messageId pod każdą\nSuma tokensUsed pokazana w karcie meta
+
+@enduml

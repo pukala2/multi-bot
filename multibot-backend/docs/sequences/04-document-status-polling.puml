@@ -1,0 +1,40 @@
+@startuml 04-document-status-polling
+title GET /api/documents/{id}/status - polling z UI po uploadzie
+
+actor "Admin UI\n(useDocuments)" as UI
+participant "DocumentController" as Ctrl
+participant "GetDocumentStatusUseCase\n(DocumentService)" as DS
+participant "DocumentRepository" as DR
+database "PostgreSQL" as DB
+
+note over UI #LightBlue: Po POST /api/documents\nfront pollije co 2 sek\nrefetchInterval w useDocuments\n(auto-stop gdy wszystko READY)
+
+loop dopóki status == PENDING || PROCESSING
+
+  UI -> Ctrl: GET /api/documents/{id}/status
+  activate Ctrl
+
+  Ctrl -> DS: getStatus(DocumentId)
+  activate DS
+  DS -> DR: findById(id)
+  DR -> DB: SELECT * FROM documents\nWHERE id = ? AND tenant_id = ?
+  alt nie znaleziono
+    DR --> DS: Optional.empty()
+    DS --> Ctrl: throw DocumentNotFoundException
+    Ctrl --> UI: 404 + ProblemDetail
+  else znaleziono
+    DR --> DS: Document
+    DS --> Ctrl: Document
+    deactivate DS
+
+    Ctrl --> UI: 200 OK + JSON\n{ id, filename, status, indexedAt?, errorMessage? }
+    deactivate Ctrl
+  end
+
+  note over UI: status możliwe:\n PENDING (właśnie wgrane)\n PROCESSING (Tika/embed)\n READY (chunki w bazie)\n FAILED (error w pipeline)
+
+end
+
+note over UI #LightBlue: Gdy wszystkie dokumenty\nw cache są READY/FAILED,\nTanStack Query zatrzymuje\nrefetchInterval automatycznie
+
+@enduml

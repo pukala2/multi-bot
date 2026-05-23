@@ -1,0 +1,40 @@
+@startuml 03-list-documents
+title GET /api/documents - paginowana lista dokumentów tenanta
+
+actor Client as C
+participant "RequestIdFilter" as RIF
+participant "TenantContextFilter" as TCF
+participant "DocumentController" as Ctrl
+participant "ListDocumentsUseCase\n(DocumentService)" as DS
+participant "DocumentRepository" as DR
+database "PostgreSQL" as DB
+
+C -> RIF: GET /api/documents?page=0&size=20&sort=uploadedAt,desc
+activate RIF
+RIF -> TCF: chain.doFilter()
+activate TCF
+note over TCF #LightBlue: TenantContext.set(DEFAULT_TENANT)
+
+TCF -> Ctrl: listDocuments(page, size, sort)
+activate Ctrl
+
+Ctrl -> DS: list(Pageable)
+activate DS
+DS -> DR: findAllSummaries(pageable)
+DR -> DB: SELECT id, filename, mime_type, size_bytes,\n  status, uploaded_at\nFROM documents\nWHERE tenant_id = ? \n  --> filtr dodany automatycznie\n      przez Hibernate @TenantId\nORDER BY uploaded_at DESC\nLIMIT 20 OFFSET 0
+DR --> DS: Page<DocumentSummary>
+DS --> Ctrl: Page<DocumentSummary>
+deactivate DS
+
+Ctrl -> Ctrl: mapuj na\nPaginatedDocumentResponse\n(content + pagination meta)
+
+Ctrl --> TCF: 200 OK
+deactivate Ctrl
+TCF --> RIF: response
+deactivate TCF
+RIF --> C: 200 + JSON:\n{ content: [...],\n  pagination: {totalElements, totalPages, ...} }
+deactivate RIF
+
+note over Client #LightBlue: Frontend (TanStack Query)\ncache'uje response\nkey ['documents', {page, size, sort}]
+
+@enduml
