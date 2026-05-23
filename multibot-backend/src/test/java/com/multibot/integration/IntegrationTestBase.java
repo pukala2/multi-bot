@@ -1,6 +1,7 @@
 package com.multibot.integration;
 
 import com.multibot.integration.support.MockEmbeddingConfig;
+import com.multibot.integration.support.MockLlmConfig;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import io.restassured.specification.RequestSpecification;
@@ -20,7 +21,7 @@ import java.nio.file.Path;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
-@Import(MockEmbeddingConfig.class)
+@Import({MockEmbeddingConfig.class, MockLlmConfig.class})
 public abstract class IntegrationTestBase {
 
     protected static final PostgreSQLContainer<?> POSTGRES;

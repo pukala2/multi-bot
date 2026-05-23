@@ -313,18 +313,21 @@ paths:
               $ref: '#/components/schemas/SendMessageRequest'
       responses:
         '200':
-          description: SSE stream odpowiedzi bota
+          description: |
+            Odpowiedź bota.
+
+            **MVP (Faza 6):** blocking JSON `MessageResponse`.
+
+            **Post-MVP (Faza 7):** Server-Sent Events stream z eventami `chunk`, `sources`, `done`.
           content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MessageResponse'
             text/event-stream:
               schema:
                 type: string
                 description: |
-                  Server-Sent Events stream. Każdy event ma format:
-                  ```
-                  event: <type>
-                  data: <JSON payload>
-                  ```
-                  gdzie type to `chunk`, `sources` lub `done`.
+                  Server-Sent Events stream (post-MVP).
         '400':
           $ref: '#/components/responses/BadRequest'
         '404':
