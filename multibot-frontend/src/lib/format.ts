@@ -28,3 +28,20 @@ export function timeAgo(isoDate: string): string {
 export function formatScore(score: number): string {
   return score.toFixed(3);
 }
+
+export function formatDateTime(isoDate: string): string {
+  return new Date(isoDate).toLocaleString('pl-PL', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
+
+export function formatTime(isoDate: string): string {
+  return new Date(isoDate).toLocaleTimeString('pl-PL', {
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}

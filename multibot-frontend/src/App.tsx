@@ -5,6 +5,8 @@ import { AppShell } from '@/components/layout/AppShell';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { DocumentsPage } from '@/pages/DocumentsPage';
 import { ChatPage } from '@/pages/ChatPage';
+import { SessionsPage } from '@/pages/SessionsPage';
+import { SessionDetailPage } from '@/pages/SessionDetailPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 
 const queryClient = new QueryClient({
@@ -26,16 +28,8 @@ export default function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/documents" element={<DocumentsPage />} />
             <Route path="/chat" element={<ChatPage />} />
-            <Route
-              path="/sessions"
-              element={
-                <PlaceholderPage
-                  title="Sesje"
-                  phaseLabel="Faza F5"
-                  description="Historia rozmów użytkowników, filtrowanie po dacie, podgląd całych konwersacji. W przygotowaniu."
-                />
-              }
-            />
+            <Route path="/sessions" element={<SessionsPage />} />
+            <Route path="/sessions/:id" element={<SessionDetailPage />} />
             <Route
               path="/settings"
               element={
