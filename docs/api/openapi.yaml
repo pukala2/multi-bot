@@ -330,6 +330,25 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  /api/admin/stats:
+    get:
+      tags:
+        - Admin
+      summary: Statystyki tenanta dla dashboardu
+      description: |
+        Zwraca zagregowane metryki: liczba dokumentów (z breakdownem statusów),
+        sesji (total/today/week), wiadomości (total/today) i tokenów (total/today + szacowany koszt).
+      operationId: getAdminStats
+      responses:
+        '200':
+          description: Statystyki
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminStatsResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
 # ============================================================
 # COMPONENTS
 # ============================================================
@@ -806,6 +825,105 @@ components:
       required:
         - content
         - pagination
+
+    # === Admin ===
+
+    AdminStatsResponse:
+      type: object
+      properties:
+        documents:
+          $ref: '#/components/schemas/DocumentStats'
+        sessions:
+          $ref: '#/components/schemas/SessionStats'
+        messages:
+          $ref: '#/components/schemas/MessageStats'
+        tokens:
+          $ref: '#/components/schemas/TokenStats'
+        lastActivity:
+          type: string
+          format: date-time
+          nullable: true
+      required:
+        - documents
+        - sessions
+        - messages
+        - tokens
+
+    DocumentStats:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+          example: 4
+        byStatus:
+          type: object
+          additionalProperties:
+            type: integer
+            format: int64
+          example:
+            PENDING: 0
+            PROCESSING: 1
+            READY: 3
+            FAILED: 0
+      required:
+        - total
+        - byStatus
+
+    SessionStats:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+          example: 12
+        today:
+          type: integer
+          format: int64
+          example: 2
+        thisWeek:
+          type: integer
+          format: int64
+          example: 8
+      required:
+        - total
+        - today
+        - thisWeek
+
+    MessageStats:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+          example: 30
+        today:
+          type: integer
+          format: int64
+          example: 4
+      required:
+        - total
+        - today
+
+    TokenStats:
+      type: object
+      properties:
+        total:
+          type: integer
+          format: int64
+          example: 8472
+        today:
+          type: integer
+          format: int64
+          example: 800
+        estimatedCostUsd:
+          type: number
+          format: double
+          example: 0.004
+      required:
+        - total
+        - today
+        - estimatedCostUsd
 
   # ----- Parameters -----
   parameters:

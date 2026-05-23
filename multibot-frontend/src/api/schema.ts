@@ -153,6 +153,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Statystyki tenanta dla dashboardu
+         * @description Zwraca zagregowane metryki: liczba dokumentów (z breakdownem statusów),
+         *     sesji (total/today/week), wiadomości (total/today) i tokenów (total/today + szacowany koszt).
+         */
+        get: operations["getAdminStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -457,6 +478,78 @@ export interface components {
         PaginatedMessageResponse: {
             content: components["schemas"]["MessageResponse"][];
             pagination: components["schemas"]["PageMetadata"];
+        };
+        AdminStatsResponse: {
+            documents: components["schemas"]["DocumentStats"];
+            sessions: components["schemas"]["SessionStats"];
+            messages: components["schemas"]["MessageStats"];
+            tokens: components["schemas"]["TokenStats"];
+            /** Format: date-time */
+            lastActivity?: string | null;
+        };
+        DocumentStats: {
+            /**
+             * Format: int64
+             * @example 4
+             */
+            total: number;
+            /**
+             * @example {
+             *       "PENDING": 0,
+             *       "PROCESSING": 1,
+             *       "READY": 3,
+             *       "FAILED": 0
+             *     }
+             */
+            byStatus: {
+                [key: string]: number;
+            };
+        };
+        SessionStats: {
+            /**
+             * Format: int64
+             * @example 12
+             */
+            total: number;
+            /**
+             * Format: int64
+             * @example 2
+             */
+            today: number;
+            /**
+             * Format: int64
+             * @example 8
+             */
+            thisWeek: number;
+        };
+        MessageStats: {
+            /**
+             * Format: int64
+             * @example 30
+             */
+            total: number;
+            /**
+             * Format: int64
+             * @example 4
+             */
+            today: number;
+        };
+        TokenStats: {
+            /**
+             * Format: int64
+             * @example 8472
+             */
+            total: number;
+            /**
+             * Format: int64
+             * @example 800
+             */
+            today: number;
+            /**
+             * Format: double
+             * @example 0.004
+             */
+            estimatedCostUsd: number;
         };
     };
     responses: {
@@ -819,6 +912,27 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    getAdminStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Statystyki */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminStatsResponse"];
+                };
+            };
             500: components["responses"]["InternalServerError"];
         };
     };
