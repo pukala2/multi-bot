@@ -9,7 +9,4 @@ public record RagOptions(int topK, double minScore, double temperature, int maxT
         if (maxTokens <= 0) throw new IllegalArgumentException("maxTokens must be positive");
     }
 
-    public static RagOptions defaults() {
-        return new RagOptions(5, 0.7, 0.2, 1024);
-    }
 }

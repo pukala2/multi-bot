@@ -104,7 +104,9 @@ multibot:
   rag:
     top-k: 5                       # liczba chunków do retrieve
     candidate-multiplier: 10       # mnożnik LIMIT (pre-filter workaround dla HNSW)
-    min-score: 0.7                 # filtr similarity (cosine)
+    min-score: 0.3                 # filtr similarity (cosine). text-embedding-3-small na PL: 0.3-0.5 to typowe trafienie
+    temperature: 0.2               # losowość odpowiedzi LLM (0=deterministyczna, 1=kreatywna)
+    max-tokens: 1024               # limit tokenów w odpowiedzi LLM
 
   indexing:
     chunking:

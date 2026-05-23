@@ -1,0 +1,362 @@
+### ============================================================================
+### Multibot - manualne testy API (IntelliJ HTTP Client / VS Code REST Client)
+### ============================================================================
+### Plik testowy do ręcznych strzałów po starcie aplikacji.
+### Uruchom najpierw: ./mvnw spring-boot:run (lub w IntelliJ Run 'MultibotApplication')
+###
+### Zmienne globalne (zmień jeśli chcesz):
+@host = http://localhost:8080
+@contentType = application/json
+###
+### Pliki testowe znajdują się w katalogu ./test-data/ :
+###   - kosmotech-faq.txt        - fikcyjne FAQ firmy "Kosmotech"
+###   - kosmotech-regulamin.txt  - fikcyjny regulamin
+###   - kosmotech-produkty.md    - fikcyjny katalog produktów
+###
+### Sprawdzaj odpowiedzi bota: powinien przytaczać KONKRETNE fakty z naszych
+### plików (np. "47 zł / sztuka", "fioletowo-złoty", "Helios-Krk"), a nie
+### ogólną wiedzę LLM-a.
+### ============================================================================
+
+
+### ------------------------------------------------------------
+### 0. HEALTH CHECK
+### ------------------------------------------------------------
+
+### Liveness probe (zawsze 200 jeśli aplikacja żyje)
+GET {{host}}/actuator/health/liveness
+
+### Readiness probe (200 dopiero gdy aplikacja gotowa)
+GET {{host}}/actuator/health/readiness
+
+### Pełny health (datasource, modulith itp.)
+GET {{host}}/actuator/health
+
+
+### ------------------------------------------------------------
+### 1. UPLOAD DOKUMENTÓW
+### ------------------------------------------------------------
+
+### Upload FAQ (.txt). Po response zapisuje id do zmiennej client.global.set
+POST {{host}}/api/documents
+Content-Type: multipart/form-data; boundary=BoundaryFAQ
+X-Request-Id: req-upload-faq-001
+
+--BoundaryFAQ
+Content-Disposition: form-data; name="file"; filename="kosmotech-faq.txt"
+Content-Type: text/plain
+
+< ./test-data/kosmotech-faq.txt
+--BoundaryFAQ--
+
+> {%
+client.global.set("faq_doc_id", response.body.id);
+client.log("Saved faq_doc_id = " + response.body.id);
+%>
+
+
+### Upload Regulamin (.txt)
+POST {{host}}/api/documents
+Content-Type: multipart/form-data; boundary=BoundaryReg
+X-Request-Id: req-upload-regulamin-001
+
+--BoundaryReg
+Content-Disposition: form-data; name="file"; filename="kosmotech-regulamin.txt"
+Content-Type: text/plain
+
+< ./test-data/kosmotech-regulamin.txt
+--BoundaryReg--
+
+> {%
+client.global.set("regulamin_doc_id", response.body.id);
+client.log("Saved regulamin_doc_id = " + response.body.id);
+%>
+
+
+### Upload Katalog produktów (.md)
+POST {{host}}/api/documents
+Content-Type: multipart/form-data; boundary=BoundaryProd
+X-Request-Id: req-upload-produkty-001
+
+--BoundaryProd
+Content-Disposition: form-data; name="file"; filename="kosmotech-produkty.md"
+Content-Type: text/markdown
+
+< ./test-data/kosmotech-produkty.md
+--BoundaryProd--
+
+> {%
+client.global.set("produkty_doc_id", response.body.id);
+client.log("Saved produkty_doc_id = " + response.body.id);
+%>
+
+
+### Walidacja: upload pliku z niedozwolonym rozszerzeniem (powinien zwrócić 400)
+POST {{host}}/api/documents
+Content-Type: multipart/form-data; boundary=BoundaryExe
+
+--BoundaryExe
+Content-Disposition: form-data; name="file"; filename="malware.exe"
+Content-Type: application/octet-stream
+
+dummy binary content
+--BoundaryExe--
+
+
+### ------------------------------------------------------------
+### 2. STATUS DOKUMENTÓW (czekaj aż status = READY)
+### ------------------------------------------------------------
+
+### Sprawdź status FAQ - po uploadu indeksowanie trwa kilka sekund
+### Powtarzaj aż "status": "READY"
+GET {{host}}/api/documents/019e5431-6e5b-75f8-92e7-88460277660b/status
+
+### Sprawdź status Regulaminu
+GET {{host}}/api/documents/{{regulamin_doc_id}}/status
+
+### Sprawdź status Produktów
+GET {{host}}/api/documents/{{produkty_doc_id}}/status
+
+### Pełne metadane FAQ
+GET {{host}}/api/documents/{{faq_doc_id}}
+
+
+### ------------------------------------------------------------
+### 3. LISTA DOKUMENTÓW
+### ------------------------------------------------------------
+
+### Domyślna paginacja
+GET {{host}}/api/documents
+
+### Z paginacją i sortowaniem
+GET {{host}}/api/documents?page=0&size=20&sort=uploadedAt,desc
+
+
+### ------------------------------------------------------------
+### 4. SESJE CZATU
+### ------------------------------------------------------------
+
+### Start sesji (anonimowy, bez metadanych)
+POST {{host}}/api/chat/sessions
+Content-Type: {{contentType}}
+
+{}
+
+> {%
+client.global.set("session_id", response.body.id);
+client.log("Saved session_id = " + response.body.id);
+%>
+
+
+### Start sesji z anonymousId i metadanymi
+POST {{host}}/api/chat/sessions
+Content-Type: {{contentType}}
+X-Request-Id: req-start-session-anon
+
+{
+  "anonymousId": "anon-12345",
+  "metadata": {
+    "source": "manual-test",
+    "channel": "requests-http"
+  }
+}
+
+
+### Lista sesji
+GET {{host}}/api/chat/sessions
+
+
+### Historia konkretnej sesji
+GET {{host}}/api/chat/sessions/019e550a-2585-72de-8e04-30c0143bca92/messages
+
+
+### ------------------------------------------------------------
+### 5. WIADOMOŚCI - WARIANT BLOKUJĄCY (JSON)
+### ------------------------------------------------------------
+### Pytania sprawdzające czy bot CZYTA nasze źródła:
+### - powinien podać KONKRETNE wartości (47 zł, 27,3 g, 17 dni, fioletowo-złoty)
+### - jeśli odpowiada ogólnikami "nie wiem" / "brak informacji" - kontekst nie dotarł
+###   (sprawdź logi indeksowania)
+
+### Pytanie 1: konkretna cena (powinien znać "47 zł" z katalogu produktów)
+POST {{host}}/api/chat/sessions/019e550a-2585-72de-8e04-30c0143bca92/messages
+Content-Type: {{contentType}}
+Accept: application/json
+X-Request-Id: req-msg-cena
+
+{
+  "content": "Ile kosztuje jeden Kosmiczny Pomidor Classic?"
+}
+
+
+### Pytanie 2: konkretny szczegół fizyczny (waga, kolor)
+POST {{host}}/api/chat/sessions/{{session_id}}/messages
+Content-Type: {{contentType}}
+Accept: application/json
+
+{
+  "content": "Ile waży jeden Kosmiczny Pomidor i jaki ma kolor?"
+}
+
+
+### Pytanie 3: okres zwrotu (17 dni)
+POST {{host}}/api/chat/sessions/{{session_id}}/messages
+Content-Type: {{contentType}}
+Accept: application/json
+
+{
+  "content": "Jaki jest okres zwrotu Kosmicznych Pomidorów?"
+}
+
+
+### Pytanie 4: metody płatności (KOSMO-COIN, voucher Zielona Mgławica)
+POST {{host}}/api/chat/sessions/{{session_id}}/messages
+Content-Type: {{contentType}}
+Accept: application/json
+
+{
+  "content": "Jakie metody płatności akceptuje Kosmotech?"
+}
+
+
+### Pytanie 5: dostawa marsjańska (test absurdalnego faktu)
+POST {{host}}/api/chat/sessions/{{session_id}}/messages
+Content-Type: {{contentType}}
+Accept: application/json
+
+{
+  "content": "Czy dostarczacie na Marsa i ile to kosztuje?"
+}
+
+
+### Pytanie 6: program lojalnościowy (poziomy KosmoClub, progi punktowe)
+POST {{host}}/api/chat/sessions/{{session_id}}/messages
+Content-Type: {{contentType}}
+Accept: application/json
+
+{
+  "content": "Opowiedz o programie KosmoClub i progach lojalnościowych."
+}
+
+
+### Pytanie 7: kontrolne (poza kontekstem - bot powinien grzecznie odmówić)
+POST {{host}}/api/chat/sessions/{{session_id}}/messages
+Content-Type: {{contentType}}
+Accept: application/json
+
+{
+  "content": "Ile waży Wieża Eiffla?"
+}
+
+
+### ------------------------------------------------------------
+### 6. WIADOMOŚCI - WARIANT STREAMING (SSE)
+### ------------------------------------------------------------
+### Jak działa: bot wysyła tokeny po jednym jako Server-Sent Events.
+### Format eventów:
+###   event:chunk  -> data:{"text":"słowo "}        (powtarzane N razy)
+###   event:sources -> data:{"sources":[...]}       (raz, przed końcem)
+###   event:done   -> data:{"messageId":"...","tokensUsed":N}  (raz, na końcu)
+###
+### UWAGA: IntelliJ HTTP Client pokazuje cały strumień DOPIERO po zakończeniu.
+### Dla podglądu na żywo (tokeny pojawiają się jeden po drugim) - użyj curl
+### w terminalu (komendy poniżej).
+
+### >>>>> GOTOWY DO STRZAŁU - tylko kliknij ▶ <<<<<
+### Sesja na sztywno: 019e5518-2d14-737a-bb15-e4c328619ebe (istnieje w DB z testów)
+### Jeśli kasowałeś dane / zmienił się tenant - stwórz nową przez sekcję 4
+### i podmień UUID poniżej.
+
+### Pytanie 1 - krótka odpowiedź (szybki sanity check streamingu)
+POST {{host}}/api/chat/sessions/019e5518-2d14-737a-bb15-e4c328619ebe/messages
+Content-Type: {{contentType}}
+Accept: text/event-stream
+X-Request-Id: stream-short-001
+
+{
+  "content": "Jaki smak i kolor mają Kosmiczne Pomidory?"
+}
+
+
+### Pytanie 2 - długa odpowiedź (najlepiej widać typing effect)
+POST {{host}}/api/chat/sessions/019e5518-2d14-737a-bb15-e4c328619ebe/messages
+Content-Type: {{contentType}}
+Accept: text/event-stream
+X-Request-Id: stream-long-002
+
+{
+  "content": "Opisz mi szczegółowo Kosmiczne Pomidory Classic. Podaj smak, kolor, wagę, cenę, pochodzenie, termin przydatności i co je wyróżnia od innych pomidorów na rynku. Następnie wymień wszystkie inne produkty z katalogu Kosmotech wraz z cenami."
+}
+
+
+### --- SSE NA ŻYWO w terminalu (skopiuj cały blok do bash) ---
+### # Najpierw stwórz świeżą sesję jednym strzałem (jq musi być zainstalowane):
+### SESSION=$(curl -sX POST http://localhost:8080/api/chat/sessions \
+###   -H "Content-Type: application/json" -d '{}' | jq -r .id)
+### echo "Sesja: $SESSION"
+###
+### # Potem strzał SSE - tokeny pojawiają się natychmiast (flag -N = no buffer):
+### curl -N -X POST "http://localhost:8080/api/chat/sessions/$SESSION/messages" \
+###   -H "Accept: text/event-stream" \
+###   -H "Content-Type: application/json" \
+###   -H "X-Request-Id: stream-cli-001" \
+###   -d '{"content":"Opowiedz mi szczegółowo o Kosmicznych Pomidorach i ich właściwościach."}'
+
+
+### ------------------------------------------------------------
+### 7. X-REQUEST-ID PROPAGATION
+### ------------------------------------------------------------
+
+### Z własnym X-Request-Id (powinien wrócić w response header)
+POST {{host}}/api/chat/sessions
+Content-Type: {{contentType}}
+X-Request-Id: trace-manual-test-xyz-999
+
+{}
+
+
+### Bez X-Request-Id (backend generuje UUID i zwraca w header)
+POST {{host}}/api/chat/sessions
+Content-Type: {{contentType}}
+
+{}
+
+
+### ------------------------------------------------------------
+### 8. USUWANIE DOKUMENTÓW
+### ------------------------------------------------------------
+
+### Usuń FAQ (kaskadowo czyści chunks + plik z stored_files)
+DELETE {{host}}/api/documents/{{faq_doc_id}}
+Accept: */*
+
+### Usuń Regulamin
+DELETE {{host}}/api/documents/{{regulamin_doc_id}}
+Accept: */*
+
+### Usuń Produkty
+DELETE {{host}}/api/documents/{{produkty_doc_id}}
+Accept: */*
+
+
+### ------------------------------------------------------------
+### 9. ACTUATOR / DEBUG
+### ------------------------------------------------------------
+
+### Modulith - struktura modułów
+GET {{host}}/actuator/modulith
+
+### Metryki
+GET {{host}}/actuator/metrics
+
+### Konkretna metryka (np. JVM memory)
+GET {{host}}/actuator/metrics/jvm.memory.used
+
+### Info
+GET {{host}}/actuator/info
+
+### OpenAPI spec (jeśli wystawione)
+GET {{host}}/v3/api-docs
+
+### Swagger UI
+GET {{host}}/swagger-ui/index.html

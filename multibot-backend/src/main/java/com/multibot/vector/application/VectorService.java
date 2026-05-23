@@ -1,6 +1,7 @@
 package com.multibot.vector.application;
 
 import com.multibot.shared.tenant.TenantId;
+import com.multibot.vector.config.VectorProperties;
 import com.multibot.tenancy.TenantContext;
 import com.multibot.vector.domain.model.Chunk;
 import com.multibot.vector.domain.model.VectorSearchQuery;
@@ -9,7 +10,6 @@ import com.multibot.vector.domain.port.in.DeleteChunksByDocumentUseCase;
 import com.multibot.vector.domain.port.in.SearchChunksUseCase;
 import com.multibot.vector.domain.port.in.StoreChunksUseCase;
 import com.multibot.vector.domain.port.out.ChunkStore;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -22,10 +22,9 @@ class VectorService implements StoreChunksUseCase, SearchChunksUseCase, DeleteCh
     private final ChunkStore chunkStore;
     private final int candidateMultiplier;
 
-    VectorService(ChunkStore chunkStore,
-                  @Value("${multibot.rag.candidate-multiplier}") int candidateMultiplier) {
+    VectorService(ChunkStore chunkStore, VectorProperties vectorProperties) {
         this.chunkStore = chunkStore;
-        this.candidateMultiplier = candidateMultiplier;
+        this.candidateMultiplier = vectorProperties.candidateMultiplier();
     }
 
     @Override

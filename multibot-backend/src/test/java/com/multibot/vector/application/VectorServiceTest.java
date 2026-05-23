@@ -37,7 +37,7 @@ class VectorServiceTest {
     @BeforeEach
     void setUp() {
         chunkStore = mock(ChunkStore.class);
-        service = new VectorService(chunkStore, CANDIDATE_MULTIPLIER);
+        service = new VectorService(chunkStore, new com.multibot.vector.config.VectorProperties(CANDIDATE_MULTIPLIER));
         TenantContext.set(TENANT_A);
     }
 

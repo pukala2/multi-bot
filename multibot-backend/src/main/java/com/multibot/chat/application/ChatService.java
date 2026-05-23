@@ -19,6 +19,7 @@ import com.multibot.chat.domain.port.in.StreamMessageUseCase;
 import com.multibot.chat.domain.port.out.ChatRepository;
 import com.multibot.document.domain.model.DocumentId;
 import com.multibot.document.domain.port.in.GetDocumentUseCase;
+import com.multibot.rag.config.RagProperties;
 import com.multibot.rag.domain.model.RagAnswer;
 import com.multibot.rag.domain.model.RagMessage;
 import com.multibot.rag.domain.model.RagOptions;
@@ -44,16 +45,27 @@ class ChatService implements StartSessionUseCase, SendMessageUseCase, StreamMess
     private final ChatRepository repository;
     private final AnswerQuestionUseCase answerQuestionUseCase;
     private final GetDocumentUseCase getDocumentUseCase;
+    private final RagProperties ragProperties;
     private final int memoryWindowSize;
 
     ChatService(ChatRepository repository,
                 AnswerQuestionUseCase answerQuestionUseCase,
                 GetDocumentUseCase getDocumentUseCase,
+                RagProperties ragProperties,
                 @Value("${multibot.chat.memory.window-size}") int memoryWindowSize) {
         this.repository = repository;
         this.answerQuestionUseCase = answerQuestionUseCase;
         this.getDocumentUseCase = getDocumentUseCase;
+        this.ragProperties = ragProperties;
         this.memoryWindowSize = memoryWindowSize;
+    }
+
+    private RagOptions ragOptionsFromConfig() {
+        return new RagOptions(
+                ragProperties.topK(),
+                ragProperties.minScore(),
+                ragProperties.temperature(),
+                ragProperties.maxTokens());
     }
 
     @Override
@@ -89,7 +101,7 @@ class ChatService implements StartSessionUseCase, SendMessageUseCase, StreamMess
                 .toList();
 
         RagAnswer answer = answerQuestionUseCase.answer(
-                new RagQuery(command.content(), history, RagOptions.defaults()));
+                new RagQuery(command.content(), history, ragOptionsFromConfig()));
 
         List<Citation> citations = answer.citations().stream()
                 .map(this::toCitation)
@@ -120,7 +132,7 @@ class ChatService implements StartSessionUseCase, SendMessageUseCase, StreamMess
                 .toList();
 
         StreamingRagAnswer ragAnswer = answerQuestionUseCase.streamAnswer(
-                new RagQuery(command.content(), history, RagOptions.defaults()));
+                new RagQuery(command.content(), history, ragOptionsFromConfig()));
 
         List<Citation> citations = ragAnswer.citations().stream()
                 .map(this::toCitation)

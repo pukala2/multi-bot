@@ -1,0 +1,125 @@
+REGULAMIN SKLEPU INTERNETOWEGO KOSMOTECH SP. Z O.O.
+=====================================================
+
+Obowiązuje od dnia 1 marca 2025 roku.
+Wersja regulaminu: 4.2.1
+
+
+§1 POSTANOWIENIA OGÓLNE
+
+1. Niniejszy regulamin określa zasady korzystania ze sklepu internetowego prowadzonego
+   pod adresem www.kosmotech-fictional.example przez Kosmotech Sp. z o.o. z siedzibą
+   w Krakowie, ul. Mgławicowa 42/7, NIP 6783920184, REGON 519382746, KRS 0000928374.
+
+2. Kapitał zakładowy spółki wynosi 8 472 000 zł i został wpłacony w całości.
+
+3. Sklep specjalizuje się w sprzedaży Kosmicznych Pomidorów (Tomatum Cosmicum) oraz
+   produktów powiązanych: KosmoSosu Pomidorowego, soku KosmoFresh oraz suplementu
+   diety KosmoVit-7.
+
+
+§2 ZAMAWIANIE I CENY
+
+1. Ceny w sklepie wyrażone są w polskich złotych (PLN) i zawierają podatek VAT.
+
+2. Cena jednego Kosmicznego Pomidora wynosi 47,00 zł brutto. Cennik produktów
+   pochodnych:
+   - KosmoSos Pomidorowy 220 ml: 89,99 zł
+   - Sok KosmoFresh 500 ml: 124,50 zł
+   - Suplement KosmoVit-7 (90 kapsułek): 379,00 zł
+
+3. Minimalna wartość zamówienia wynosi 50,00 zł. Zamówienia poniżej tej kwoty są
+   automatycznie odrzucane przez system KosmoOrder.
+
+4. Klient otrzymuje numer zamówienia w formacie KMT-RRRR-NNNNNNN, np. KMT-2025-0001234.
+
+
+§3 DOSTAWA
+
+1. Dostawa realizowana jest wyłącznie do następujących województw na terenie Polski:
+   małopolskie, podkarpackie. Dodatkowo prowadzimy dostawy do placówki Olympus-3 na
+   Marsie (czas dostawy: około 4 lata świetlne ziemskie).
+
+2. Koszty dostawy:
+   - Standardowa (6 dni roboczych): 19,99 zł
+   - Orbita Premium (38 godzin): 144,99 zł
+   - Dostawa marsjańska: 47 998,00 zł (wymaga umowy odrębnej)
+
+3. Dostawy realizowane są przez kuriera KosmoExpress w godzinach 7:00-22:00.
+
+
+§4 PRAWO ODSTĄPIENIA
+
+1. Klient ma prawo odstąpić od umowy w terminie 17 dni kalendarzowych od dnia
+   otrzymania produktu, bez podania przyczyny.
+
+2. Zwrot możliwy jest WYŁĄCZNIE w przypadku nienaruszonej fioletowo-złotej pieczęci
+   foliowej. Po przerwaniu pieczęci Kosmiczny Pomidor traci właściwości
+   anty-grawitacyjne i nie podlega zwrotowi.
+
+3. Klient wypełnia formularz KMT-119 dostępny w panelu klienta. Środki zostają
+   zwrócone w terminie 5 dni roboczych od dnia odebrania przesyłki zwrotnej przez
+   magazyn Helios-Krk.
+
+4. Koszt zwrotu (przesyłka kurierska KosmoExpress Return) wynosi 24,99 zł i pokrywa
+   go klient, chyba że zwrot wynika z winy sprzedawcy.
+
+
+§5 REKLAMACJE
+
+1. Reklamacje rozpatrywane są w terminie 14 dni roboczych od dnia otrzymania zgłoszenia.
+
+2. Reklamacje należy składać:
+   - Mailowo: reklamacje@kosmotech-fictional.example
+   - Pisemnie: ul. Mgławicowa 42/7, 31-007 Kraków
+   - Przez formularz KMT-220 w panelu klienta
+
+3. W przypadku uznania reklamacji klient otrzymuje:
+   - Nowy produkt (priorytet 1)
+   - Zwrot kosztów (priorytet 2)
+   - Voucher "Zielona Mgławica" o wartości 130% ceny produktu (priorytet 3, do wyboru
+     przez klienta)
+
+
+§6 PROGRAM LOJALNOŚCIOWY KOSMO-CLUB
+
+1. Każdy klient po pierwszym zamówieniu automatycznie staje się członkiem programu
+   KosmoClub.
+
+2. Za każde wydane 10 zł klient otrzymuje 1 punkt KosmoPoint.
+
+3. Progi programu:
+   - Bronze: 0 - 499 punktów (rabat 3%)
+   - Silver: 500 - 1999 punktów (rabat 7%)
+   - Gold: 2000 - 9999 punktów (rabat 12%)
+   - Platinum: 10000+ punktów (rabat 18% + darmowa dostawa)
+
+4. Punkty są ważne przez 18 miesięcy od daty naliczenia.
+
+
+§7 OCHRONA DANYCH OSOBOWYCH
+
+1. Administratorem danych osobowych jest Kosmotech Sp. z o.o.
+
+2. Inspektorem Ochrony Danych jest Anna Mgławicka-Kowalska, e-mail:
+   iod@kosmotech-fictional.example.
+
+3. Dane przetwarzane są zgodnie z RODO oraz wewnętrzną polityką OK-DAT-2024 dostępną
+   na stronie internetowej.
+
+4. Okres przechowywania danych: 7 lat od ostatniego zamówienia (wymóg podatkowy)
+   lub do momentu wycofania zgody.
+
+
+§8 POSTANOWIENIA KOŃCOWE
+
+1. W sprawach nieuregulowanych niniejszym regulaminem zastosowanie mają przepisy
+   prawa polskiego, w szczególności Kodeksu Cywilnego oraz Ustawy o prawach konsumenta.
+
+2. Spory rozstrzyga sąd właściwy dla siedziby Kosmotech Sp. z o.o., tj. Sąd Rejonowy
+   dla Krakowa-Śródmieścia.
+
+3. Regulamin może zostać zmieniony z 30-dniowym wyprzedzeniem. O zmianach klienci
+   informowani są mailowo oraz w panelu KosmoClub.
+
+4. Bieżąca wersja regulaminu (4.2.1) zastępuje wszystkie poprzednie wersje.

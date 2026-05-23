@@ -4,15 +4,16 @@
 
 spring:
   jpa:
-    show-sql: true                 # czytelne SQL w konsoli
+    show-sql: false                # SQL logi wyłączone (włącz tylko gdy debugujesz query)
     properties:
       hibernate:
-        format_sql: true
+        format_sql: true           # gdy włączysz DEBUG dla org.hibernate.SQL - sformatuje ładnie
 
 logging:
   level:
     org.springframework.ai.chat.client.advisor: DEBUG
-    org.hibernate.SQL: DEBUG
+    org.hibernate.SQL: WARN        # WARN = praktycznie off (DEBUG/TRACE żeby zobaczyć SQL)
+    org.hibernate.orm.jdbc.bind: WARN   # parametry binding też uciszone
     # Spring Modulith - logi eventów
     org.springframework.modulith: DEBUG
 
