@@ -1,11 +1,13 @@
 package com.multibot.integration;
 
+import com.multibot.integration.support.MockEmbeddingConfig;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import io.restassured.specification.RequestSpecification;
 import org.junit.jupiter.api.BeforeEach;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.web.server.LocalServerPort;
+import org.springframework.context.annotation.Import;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
@@ -18,6 +20,7 @@ import java.nio.file.Path;
 
 @SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT)
 @ActiveProfiles("test")
+@Import(MockEmbeddingConfig.class)
 public abstract class IntegrationTestBase {
 
     protected static final PostgreSQLContainer<?> POSTGRES;

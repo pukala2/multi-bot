@@ -133,8 +133,7 @@ class DocumentResourceIT extends IntegrationTestBase {
                 .statusCode(200)
                 .body("id", equalTo(id.toString()))
                 .body("filename", equalTo("greeting.txt"))
-                .body("mimeType", equalTo("text/plain"))
-                .body("status", equalTo("PENDING"));
+                .body("mimeType", equalTo("text/plain"));
     }
 
     @Test
@@ -162,7 +161,7 @@ class DocumentResourceIT extends IntegrationTestBase {
                 .then()
                 .statusCode(200)
                 .body("id", equalTo(id.toString()))
-                .body("status", equalTo("PENDING"));
+                .body("status", org.hamcrest.Matchers.notNullValue());
     }
 
     @Test

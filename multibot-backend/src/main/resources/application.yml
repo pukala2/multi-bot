@@ -40,9 +40,9 @@ spring:
       - classpath:db/migration/file
       - classpath:db/migration/vector
       - classpath:db/migration/document
+      - classpath:db/migration/indexing
       # Kolejne moduły dodawane gdy implementujemy:
       # - classpath:db/migration/chat
-      # - classpath:db/migration/indexing
 
   # ----- Multipart (upload plików) -----
   servlet:
