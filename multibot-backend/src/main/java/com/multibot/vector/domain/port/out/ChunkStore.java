@@ -12,7 +12,9 @@ public interface ChunkStore {
 
     void storeAll(List<Chunk> chunks);
 
-    List<VectorSearchResult> search(TenantId tenantId, Embedding queryEmbedding, int candidateLimit);
+    List<VectorSearchResult> search(TenantId tenantId, UUID versionId, Embedding queryEmbedding, int candidateLimit);
 
     void deleteByDocument(TenantId tenantId, UUID documentId);
+
+    void copyChunks(UUID fromVersionId, UUID toVersionId, java.util.Map<UUID, UUID> documentIdMapping);
 }

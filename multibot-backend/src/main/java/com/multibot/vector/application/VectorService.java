@@ -1,7 +1,6 @@
 package com.multibot.vector.application;
 
 import com.multibot.botversion.domain.port.in.GetActiveVersionUseCase;
-import com.multibot.botversion.domain.port.in.VersionDocumentsUseCase;
 import com.multibot.shared.tenant.TenantId;
 import com.multibot.vector.config.VectorProperties;
 import com.multibot.tenancy.TenantContext;
@@ -16,7 +15,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Set;
+import java.util.Optional;
 import java.util.UUID;
 
 @Service
@@ -24,17 +23,14 @@ class VectorService implements StoreChunksUseCase, SearchChunksUseCase, DeleteCh
 
     private final ChunkStore chunkStore;
     private final GetActiveVersionUseCase getActiveVersion;
-    private final VersionDocumentsUseCase versionDocuments;
     private final int candidateMultiplier;
 
     VectorService(ChunkStore chunkStore,
                   VectorProperties vectorProperties,
-                  GetActiveVersionUseCase getActiveVersion,
-                  VersionDocumentsUseCase versionDocuments) {
+                  GetActiveVersionUseCase getActiveVersion) {
         this.chunkStore = chunkStore;
         this.candidateMultiplier = vectorProperties.candidateMultiplier();
         this.getActiveVersion = getActiveVersion;
-        this.versionDocuments = versionDocuments;
     }
 
     @Override
@@ -55,20 +51,16 @@ class VectorService implements StoreChunksUseCase, SearchChunksUseCase, DeleteCh
     @Transactional(readOnly = true)
     public List<VectorSearchResult> search(VectorSearchQuery query) {
         TenantId tenant = TenantContext.get();
-        int candidateLimit = query.topK() * candidateMultiplier;
-
-        Set<UUID> activeDocuments = getActiveVersion.getActiveVersionId()
-                .map(versionDocuments::getDocumentIdsInVersion)
-                .orElse(Set.of());
-
-        if (activeDocuments.isEmpty()) {
+        Optional<UUID> activeVersionId = getActiveVersion.getActiveVersionId();
+        if (activeVersionId.isEmpty()) {
             return List.of();
         }
 
-        List<VectorSearchResult> candidates = chunkStore.search(tenant, query.queryEmbedding(), candidateLimit);
+        int candidateLimit = query.topK() * candidateMultiplier;
+        List<VectorSearchResult> candidates = chunkStore.search(
+                tenant, activeVersionId.get(), query.queryEmbedding(), candidateLimit);
 
         return candidates.stream()
-                .filter(r -> activeDocuments.contains(r.chunk().documentId()))
                 .filter(r -> r.similarity() >= query.minScore())
                 .limit(query.topK())
                 .toList();

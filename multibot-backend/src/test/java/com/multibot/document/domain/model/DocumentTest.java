@@ -58,6 +58,7 @@ class DocumentTest {
         assertThatThrownBy(() -> new Document(
                 DocumentId.generate(),
                 TenantId.of(UUID.randomUUID()),
+                UUID.randomUUID(),
                 StoredFileId.generate(),
                 "",
                 "application/pdf",
@@ -77,6 +78,7 @@ class DocumentTest {
         assertThatThrownBy(() -> new Document(
                 DocumentId.generate(),
                 TenantId.of(UUID.randomUUID()),
+                UUID.randomUUID(),
                 StoredFileId.generate(),
                 "doc.pdf",
                 "application/pdf",
@@ -96,6 +98,7 @@ class DocumentTest {
         return Document.newlyUploaded(
                 DocumentId.generate(),
                 TenantId.of(UUID.randomUUID()),
+                UUID.randomUUID(),
                 StoredFileId.generate(),
                 "test.pdf",
                 "application/pdf",

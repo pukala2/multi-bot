@@ -9,6 +9,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Component;
 
 import java.util.Optional;
+import java.util.UUID;
 
 @Component
 class DocumentRepositoryAdapter implements DocumentRepository {
@@ -35,6 +36,12 @@ class DocumentRepositoryAdapter implements DocumentRepository {
     @Override
     public Page<DocumentSummary> findAllSummaries(Pageable pageable) {
         return jpaRepository.findAll(pageable)
+                .map(DocumentEntityMapper::toSummary);
+    }
+
+    @Override
+    public Page<DocumentSummary> findByVersion(UUID versionId, Pageable pageable) {
+        return jpaRepository.findByVersionId(versionId, pageable)
                 .map(DocumentEntityMapper::toSummary);
     }
 

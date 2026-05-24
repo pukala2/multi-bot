@@ -37,6 +37,9 @@ class DocumentJpaEntity {
     @Column(name = "tenant_id", nullable = false, updatable = false)
     private UUID tenantId;
 
+    @Column(name = "version_id", nullable = false)
+    private UUID versionId;
+
     @Column(name = "stored_file_id", nullable = false)
     private UUID storedFileId;
 

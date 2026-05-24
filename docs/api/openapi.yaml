@@ -40,6 +40,13 @@ paths:
         - $ref: '#/components/parameters/PageParam'
         - $ref: '#/components/parameters/SizeParam'
         - $ref: '#/components/parameters/SortParam'
+        - name: versionId
+          in: query
+          required: false
+          description: Filtruj po wersji bota (jeśli puste — wszystkie tenanta)
+          schema:
+            type: string
+            format: uuid
       responses:
         '200':
           description: Lista dokumentów
@@ -60,6 +67,14 @@ paths:
         Upload pliku PDF/DOCX/TXT/MD. Po zapisie wyzwala asynchroniczną indeksację.
         Response zawiera dokument ze statusem `PENDING`. Klient może pollować
         `GET /api/documents/{id}/status` lub polegać na finalnym statusie `READY`.
+      parameters:
+        - name: versionId
+          in: query
+          required: false
+          description: Wgraj do konkretnej wersji bota (jeśli puste — aktywna wersja)
+          schema:
+            type: string
+            format: uuid
       requestBody:
         required: true
         content:
@@ -488,78 +503,6 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ChatbotVersionResponse'
-        '404':
-          $ref: '#/components/responses/NotFound'
-
-  /api/admin/versions/{id}/documents:
-    get:
-      tags:
-        - BotVersions
-      summary: Lista dokumentów w wersji
-      operationId: getVersionDocuments
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '200':
-          description: OK
-          content:
-            application/json:
-              schema:
-                type: array
-                items:
-                  type: string
-                  format: uuid
-
-  /api/admin/versions/{id}/documents/{documentId}:
-    put:
-      tags:
-        - BotVersions
-      summary: Dodaj dokument do wersji
-      operationId: addDocumentToVersion
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - name: documentId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '204':
-          description: Dodany
-        '404':
-          $ref: '#/components/responses/NotFound'
-    delete:
-      tags:
-        - BotVersions
-      summary: Usuń dokument z wersji
-      operationId: removeDocumentFromVersion
-      parameters:
-        - name: id
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-        - name: documentId
-          in: path
-          required: true
-          schema:
-            type: string
-            format: uuid
-      responses:
-        '204':
-          description: Usunięty
         '404':
           $ref: '#/components/responses/NotFound'
 

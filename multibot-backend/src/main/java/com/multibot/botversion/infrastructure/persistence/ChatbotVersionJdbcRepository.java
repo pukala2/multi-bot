@@ -10,10 +10,8 @@ import org.springframework.stereotype.Repository;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 @Repository
@@ -29,7 +27,7 @@ class ChatbotVersionJdbcRepository implements ChatbotVersionRepository {
     public List<ChatbotVersion> findAllByTenant(UUID tenantId) {
         return jdbc.query("""
                 SELECT v.id, v.tenant_id, v.name, v.status, v.created_at, v.published_at,
-                       COALESCE((SELECT COUNT(*) FROM version_documents vd WHERE vd.version_id = v.id), 0) AS doc_count
+                       COALESCE((SELECT COUNT(*) FROM documents d WHERE d.version_id = v.id), 0) AS doc_count
                 FROM chatbot_versions v
                 WHERE v.tenant_id = ?
                 ORDER BY v.created_at DESC
@@ -41,7 +39,7 @@ class ChatbotVersionJdbcRepository implements ChatbotVersionRepository {
         try {
             ChatbotVersion v = jdbc.queryForObject("""
                     SELECT v.id, v.tenant_id, v.name, v.status, v.created_at, v.published_at,
-                           COALESCE((SELECT COUNT(*) FROM version_documents vd WHERE vd.version_id = v.id), 0) AS doc_count
+                           COALESCE((SELECT COUNT(*) FROM documents d WHERE d.version_id = v.id), 0) AS doc_count
                     FROM chatbot_versions v
                     WHERE v.id = ? AND v.tenant_id = ?
                     """, this::mapRow, versionId, tenantId);
@@ -56,7 +54,7 @@ class ChatbotVersionJdbcRepository implements ChatbotVersionRepository {
         try {
             ChatbotVersion v = jdbc.queryForObject("""
                     SELECT v.id, v.tenant_id, v.name, v.status, v.created_at, v.published_at,
-                           COALESCE((SELECT COUNT(*) FROM version_documents vd WHERE vd.version_id = v.id), 0) AS doc_count
+                           COALESCE((SELECT COUNT(*) FROM documents d WHERE d.version_id = v.id), 0) AS doc_count
                     FROM chatbot_versions v
                     JOIN chatbot_active_version cav ON cav.version_id = v.id
                     WHERE cav.tenant_id = ?
@@ -87,11 +85,27 @@ class ChatbotVersionJdbcRepository implements ChatbotVersionRepository {
     }
 
     @Override
-    public void copyDocuments(UUID fromVersionId, UUID toVersionId) {
-        jdbc.update("""
-                INSERT INTO version_documents (version_id, document_id)
-                SELECT ?, document_id FROM version_documents WHERE version_id = ?
-                """, toVersionId, fromVersionId);
+    public void deepCopyVersion(UUID fromVersionId, UUID toVersionId) {
+        List<UUID> oldDocIds = jdbc.queryForList(
+                "SELECT id FROM documents WHERE version_id = ?", UUID.class, fromVersionId);
+
+        for (UUID oldDocId : oldDocIds) {
+            UUID newDocId = UUID.randomUUID();
+
+            jdbc.update("""
+                    INSERT INTO documents (id, tenant_id, version_id, stored_file_id, filename, mime_type, size_bytes,
+                                           status, uploaded_at, indexed_at, error_message, created_at, updated_at)
+                    SELECT ?, tenant_id, ?, stored_file_id, filename, mime_type, size_bytes,
+                           status, uploaded_at, indexed_at, error_message, NOW(), NOW()
+                    FROM documents WHERE id = ?
+                    """, newDocId, toVersionId, oldDocId);
+
+            jdbc.update("""
+                    INSERT INTO chunks (id, tenant_id, version_id, document_id, chunk_index, content, embedding, metadata, created_at)
+                    SELECT gen_random_uuid(), tenant_id, ?, ?, chunk_index, content, embedding, metadata, NOW()
+                    FROM chunks WHERE document_id = ? AND version_id = ?
+                    """, toVersionId, newDocId, oldDocId, fromVersionId);
+        }
     }
 
     @Override
@@ -117,29 +131,6 @@ class ChatbotVersionJdbcRepository implements ChatbotVersionRepository {
                 ON CONFLICT (tenant_id) DO UPDATE
                 SET version_id = EXCLUDED.version_id, activated_at = NOW()
                 """, tenantId, versionId);
-    }
-
-    @Override
-    public Set<UUID> getDocumentIdsInVersion(UUID versionId) {
-        Set<UUID> result = new HashSet<>();
-        jdbc.query("SELECT document_id FROM version_documents WHERE version_id = ?",
-                rs -> { result.add((UUID) rs.getObject(1)); },
-                versionId);
-        return result;
-    }
-
-    @Override
-    public void addDocument(UUID versionId, UUID documentId) {
-        jdbc.update("""
-                INSERT INTO version_documents (version_id, document_id) VALUES (?, ?)
-                ON CONFLICT DO NOTHING
-                """, versionId, documentId);
-    }
-
-    @Override
-    public void removeDocument(UUID versionId, UUID documentId) {
-        jdbc.update("DELETE FROM version_documents WHERE version_id = ? AND document_id = ?",
-                versionId, documentId);
     }
 
     @Override

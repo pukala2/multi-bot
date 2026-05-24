@@ -140,6 +140,7 @@ class IndexingService implements IndexDocumentUseCase {
                 .mapToObj(i -> new Chunk(
                         ChunkId.generate(),
                         tenant,
+                        document.versionId(),
                         document.id().value(),
                         i,
                         chunkTexts.get(i),

@@ -6,11 +6,13 @@ type DocumentResponse = components['schemas']['DocumentResponse'];
 
 interface UploadVariables {
   file: File;
+  versionId?: string;
   onProgress?: (percent: number) => void;
 }
 
 function uploadWithProgress(
   file: File,
+  versionId: string | undefined,
   onProgress?: (percent: number) => void
 ): Promise<DocumentResponse> {
   return new Promise((resolve, reject) => {
@@ -18,7 +20,10 @@ function uploadWithProgress(
     const form = new FormData();
     form.append('file', file);
 
-    xhr.open('POST', '/api/documents');
+    const url = versionId
+      ? `/api/documents?versionId=${encodeURIComponent(versionId)}`
+      : '/api/documents';
+    xhr.open('POST', url);
 
     xhr.upload.addEventListener('progress', (e) => {
       if (!e.lengthComputable || !onProgress) return;
@@ -54,7 +59,8 @@ function uploadWithProgress(
 export function useUploadDocument() {
   const queryClient = useQueryClient();
   return useMutation({
-    mutationFn: ({ file, onProgress }: UploadVariables) => uploadWithProgress(file, onProgress),
+    mutationFn: ({ file, versionId, onProgress }: UploadVariables) =>
+      uploadWithProgress(file, versionId, onProgress),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['documents'] });
     },

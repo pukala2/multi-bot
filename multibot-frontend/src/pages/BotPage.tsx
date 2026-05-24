@@ -16,7 +16,6 @@ import {
   useCreateVersion,
   useActivateVersion,
   useDeleteVersion,
-  useVersionDocuments,
 } from '@/hooks/useVersions';
 import { showApiError } from '@/api/errors';
 import { timeAgo } from '@/lib/format';
@@ -56,11 +55,8 @@ export function BotPage() {
   }, [versions.data, selectedVersionId]);
 
   const selectedVersion = versions.data?.find((v) => v.id === selectedVersionId) ?? null;
-  const versionDocs = useVersionDocuments(selectedVersionId);
-  const allDocs = useDocuments({ size: 100 });
-
-  const docIdsInVersion = new Set(versionDocs.data ?? []);
-  const visibleDocs = (allDocs.data?.content ?? []).filter((d) => docIdsInVersion.has(d.id ?? ''));
+  const versionDocs = useDocuments({ size: 100, versionId: selectedVersionId ?? undefined });
+  const visibleDocs = versionDocs.data?.content ?? [];
 
   const handleCreate = () => {
     if (!newName.trim()) {
@@ -201,20 +197,20 @@ export function BotPage() {
             </Badge>
           </div>
 
-          {selectedVersion.status !== 'ARCHIVED' && <UploadZone />}
+          {selectedVersion.status !== 'ARCHIVED' && <UploadZone versionId={selectedVersion.id} />}
 
           <Card>
             <CardHeader>
               <div>
                 <CardTitle>Lista dokumentów</CardTitle>
                 <CardSubtitle>
-                  {versionDocs.data?.length ?? '—'} dokumentów w tej wersji
+                  {versionDocs.data?.pagination?.totalElements ?? '—'} dokumentów w tej wersji
                 </CardSubtitle>
               </div>
             </CardHeader>
             <DocumentsTable
               documents={visibleDocs}
-              loading={versionDocs.isFetching || allDocs.isFetching}
+              loading={versionDocs.isFetching}
               sort="uploadedAt,desc"
               onSortChange={() => {}}
             />

@@ -45,7 +45,7 @@ class DocumentController implements DocumentsApi {
     }
 
     @Override
-    public ResponseEntity<DocumentResponse> uploadDocument(MultipartFile file, String filename) {
+    public ResponseEntity<DocumentResponse> uploadDocument(MultipartFile file, UUID versionId, String filename) {
         if (file.isEmpty()) {
             throw new ValidationException("Uploaded file must not be empty");
         }
@@ -64,7 +64,8 @@ class DocumentController implements DocumentsApi {
         Document uploaded;
         try {
             uploaded = uploadDocumentUseCase.upload(
-                    new UploadDocumentCommand(effectiveFilename, mimeType, file.getBytes()));
+                    new UploadDocumentCommand(effectiveFilename, mimeType, file.getBytes(),
+                            java.util.Optional.ofNullable(versionId)));
         } catch (IOException e) {
             throw new ValidationException("Failed to read uploaded file: " + e.getMessage(), e);
         }
@@ -93,9 +94,11 @@ class DocumentController implements DocumentsApi {
     }
 
     @Override
-    public ResponseEntity<PaginatedDocumentResponse> listDocuments(Integer page, Integer size, String sort) {
+    public ResponseEntity<PaginatedDocumentResponse> listDocuments(Integer page, Integer size, String sort, UUID versionId) {
         var pageable = DocumentApiMapper.toPageable(page, size, sort);
-        var result = listDocumentsUseCase.list(pageable);
+        var result = versionId != null
+                ? listDocumentsUseCase.listByVersion(versionId, pageable)
+                : listDocumentsUseCase.list(pageable);
         return ResponseEntity.ok(DocumentApiMapper.toPaginatedResponse(result));
     }
 

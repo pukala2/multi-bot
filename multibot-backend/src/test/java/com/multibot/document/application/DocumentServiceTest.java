@@ -1,7 +1,6 @@
 package com.multibot.document.application;
 
 import com.multibot.botversion.domain.port.in.GetActiveVersionUseCase;
-import com.multibot.botversion.domain.port.in.VersionDocumentsUseCase;
 import com.multibot.document.domain.event.DocumentDeletedEvent;
 import com.multibot.document.domain.event.DocumentUploadedEvent;
 import com.multibot.document.domain.exception.DocumentNotFoundException;
@@ -43,8 +42,8 @@ class DocumentServiceTest {
     private DeleteChunksByDocumentUseCase deleteChunksUseCase;
     private ApplicationEventPublisher events;
     private GetActiveVersionUseCase getActiveVersion;
-    private VersionDocumentsUseCase versionDocuments;
     private DocumentService service;
+    private UUID versionId;
 
     @BeforeEach
     void setUp() {
@@ -54,10 +53,10 @@ class DocumentServiceTest {
         deleteChunksUseCase = mock(DeleteChunksByDocumentUseCase.class);
         events = mock(ApplicationEventPublisher.class);
         getActiveVersion = mock(GetActiveVersionUseCase.class);
-        versionDocuments = mock(VersionDocumentsUseCase.class);
-        when(getActiveVersion.getActiveVersionId()).thenReturn(Optional.empty());
+        versionId = UUID.randomUUID();
+        when(getActiveVersion.getActiveVersionId()).thenReturn(Optional.of(versionId));
         service = new DocumentService(repository, storeFileUseCase, deleteFileUseCase,
-                deleteChunksUseCase, events, getActiveVersion, versionDocuments);
+                deleteChunksUseCase, events, getActiveVersion);
         TenantContext.set(TENANT);
     }
 
@@ -157,6 +156,7 @@ class DocumentServiceTest {
         return Document.newlyUploaded(
                 DocumentId.generate(),
                 TENANT,
+                versionId,
                 StoredFileId.generate(),
                 "report.pdf",
                 "application/pdf",

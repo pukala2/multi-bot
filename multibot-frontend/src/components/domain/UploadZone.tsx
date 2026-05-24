@@ -31,7 +31,11 @@ function validateFile(file: File): string | null {
   return null;
 }
 
-export function UploadZone() {
+interface UploadZoneProps {
+  versionId?: string;
+}
+
+export function UploadZone({ versionId }: UploadZoneProps = {}) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   const [progress, setProgress] = useState<number | null>(null);
@@ -40,12 +44,12 @@ export function UploadZone() {
 
   const upload = useUploadDocument();
   const remove = useDeleteDocument();
-  const filenames = useDocumentFilenames();
+  const filenames = useDocumentFilenames(versionId);
 
   const performUpload = (file: File) => {
     setProgress(0);
     upload.mutate(
-      { file, onProgress: setProgress },
+      { file, versionId, onProgress: setProgress },
       {
         onSuccess: (doc) => {
           toast.success(`Wgrano "${doc.filename}"`, {

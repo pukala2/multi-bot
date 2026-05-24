@@ -6,16 +6,22 @@ interface UseDocumentsParams {
   page?: number;
   size?: number;
   sort?: string;
+  versionId?: string;
 }
 
 const PROCESSING_STATUSES = ['PENDING', 'PROCESSING'];
 
-export function useDocuments({ page = 0, size = 20, sort = 'uploadedAt,desc' }: UseDocumentsParams = {}) {
+export function useDocuments({
+  page = 0,
+  size = 20,
+  sort = 'uploadedAt,desc',
+  versionId,
+}: UseDocumentsParams = {}) {
   return useQuery({
-    queryKey: ['documents', { page, size, sort }],
+    queryKey: ['documents', { page, size, sort, versionId }],
     queryFn: async () => {
       const result = await api.GET('/api/documents', {
-        params: { query: { page, size, sort } },
+        params: { query: { page, size, sort, versionId } },
       });
       return unwrap(result);
     },

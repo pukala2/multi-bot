@@ -43,12 +43,17 @@ class VectorPersistenceIT extends IntegrationTestBase {
     @Autowired
     JdbcTemplate jdbc;
 
+    private UUID activeVersionId;
+
     @BeforeEach
     void setUpTenant() {
         TenantContext.set(DEFAULT_TENANT);
         jdbc.update("DELETE FROM chunks");
         jdbc.update("DELETE FROM documents");
         jdbc.update("DELETE FROM stored_files");
+        activeVersionId = jdbc.queryForObject(
+                "SELECT version_id FROM chatbot_active_version WHERE tenant_id = ?",
+                UUID.class, DEFAULT_TENANT.value());
     }
 
     @AfterEach
@@ -117,15 +122,29 @@ class VectorPersistenceIT extends IntegrationTestBase {
         jdbc.update("""
                 INSERT INTO tenants (id, name, slug, plan, status, created_at, updated_at)
                 VALUES (?, ?, ?, 'FREE', 'ACTIVE', NOW(), NOW())
+                ON CONFLICT (id) DO NOTHING
                 """, tenantB.value(), "Tenant B", "tenant-b");
+        // Stwórz Wersja 1 ACTIVE dla tenantB (backfill z migracji nie objął tenant utworzonych w teście)
+        UUID tenantBVersionId = UUID.randomUUID();
+        jdbc.update("""
+                INSERT INTO chatbot_versions (id, tenant_id, name, status, published_at)
+                VALUES (?, ?, 'Wersja 1', 'ACTIVE', NOW())
+                """, tenantBVersionId, tenantB.value());
+        jdbc.update("""
+                INSERT INTO chatbot_active_version (tenant_id, version_id) VALUES (?, ?)
+                ON CONFLICT (tenant_id) DO UPDATE SET version_id = EXCLUDED.version_id
+                """, tenantB.value(), tenantBVersionId);
 
         UUID documentId = createDummyDocument(tenantB);
         Embedding query = unitVector(0);
         Embedding closeMatch = similarVector(query, 0.99f);
 
         TenantContext.set(tenantB);
+        UUID savedActive = activeVersionId;
+        activeVersionId = tenantBVersionId;
         storeChunksUseCase.storeAll(List.of(
                 chunk(documentId, 0, "tenant B secret chunk", closeMatch)));
+        activeVersionId = savedActive;
 
         TenantContext.set(DEFAULT_TENANT);
         List<VectorSearchResult> resultsForA = searchChunksUseCase.search(
@@ -148,6 +167,7 @@ class VectorPersistenceIT extends IntegrationTestBase {
         Chunk chunk = new Chunk(
                 ChunkId.generate(),
                 DEFAULT_TENANT,
+                activeVersionId,
                 documentId,
                 0,
                 "with metadata",
@@ -169,6 +189,7 @@ class VectorPersistenceIT extends IntegrationTestBase {
         return new Chunk(
                 ChunkId.generate(),
                 TenantContext.get(),
+                activeVersionId,
                 documentId,
                 chunkIndex,
                 content,
@@ -210,16 +231,19 @@ class VectorPersistenceIT extends IntegrationTestBase {
     private UUID createDummyDocument(TenantId tenant) {
         UUID storedFileId = UUID.randomUUID();
         UUID documentId = UUID.randomUUID();
+        UUID versionId = jdbc.queryForObject(
+                "SELECT version_id FROM chatbot_active_version WHERE tenant_id = ?",
+                UUID.class, tenant.value());
         jdbc.update("""
                 INSERT INTO stored_files (id, tenant_id, original_filename, mime_type, size_bytes, storage_key, created_at)
                 VALUES (?, ?, 'test.pdf', 'application/pdf', 100, ?, NOW())
                 """, storedFileId, tenant.value(),
                 "tenants/" + tenant.value() + "/files/" + storedFileId + ".pdf");
         jdbc.update("""
-                INSERT INTO documents (id, tenant_id, stored_file_id, filename, mime_type, size_bytes,
+                INSERT INTO documents (id, tenant_id, version_id, stored_file_id, filename, mime_type, size_bytes,
                                        status, uploaded_at, created_at, updated_at)
-                VALUES (?, ?, ?, 'test.pdf', 'application/pdf', 100, 'PENDING', NOW(), NOW(), NOW())
-                """, documentId, tenant.value(), storedFileId);
+                VALUES (?, ?, ?, ?, 'test.pdf', 'application/pdf', 100, 'PENDING', NOW(), NOW(), NOW())
+                """, documentId, tenant.value(), versionId, storedFileId);
         return documentId;
     }
 }

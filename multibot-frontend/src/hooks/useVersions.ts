@@ -69,16 +69,3 @@ export function useDeleteVersion() {
   });
 }
 
-export function useVersionDocuments(versionId: string | null) {
-  return useQuery({
-    queryKey: ['version-documents', versionId],
-    queryFn: async () => {
-      if (!versionId) return [];
-      const result = await api.GET('/api/admin/versions/{id}/documents', {
-        params: { path: { id: versionId } },
-      });
-      return unwrap(result);
-    },
-    enabled: !!versionId,
-  });
-}

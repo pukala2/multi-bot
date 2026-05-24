@@ -263,41 +263,6 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/admin/versions/{id}/documents": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        /** Lista dokumentów w wersji */
-        get: operations["getVersionDocuments"];
-        put?: never;
-        post?: never;
-        delete?: never;
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
-    "/api/admin/versions/{id}/documents/{documentId}": {
-        parameters: {
-            query?: never;
-            header?: never;
-            path?: never;
-            cookie?: never;
-        };
-        get?: never;
-        /** Dodaj dokument do wersji */
-        put: operations["addDocumentToVersion"];
-        post?: never;
-        /** Usuń dokument z wersji */
-        delete: operations["removeDocumentFromVersion"];
-        options?: never;
-        head?: never;
-        patch?: never;
-        trace?: never;
-    };
     "/api/admin/rag-settings": {
         parameters: {
             query?: never;
@@ -878,6 +843,8 @@ export interface operations {
                  *     Multiple sort params możliwe dla sortowania kaskadowego.
                  */
                 sort?: components["parameters"]["SortParam"];
+                /** @description Filtruj po wersji bota (jeśli puste — wszystkie tenanta) */
+                versionId?: string;
             };
             header?: never;
             path?: never;
@@ -1326,72 +1293,6 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ChatbotVersionResponse"];
                 };
-            };
-            404: components["responses"]["NotFound"];
-        };
-    };
-    getVersionDocuments: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description OK */
-            200: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content: {
-                    "application/json": string[];
-                };
-            };
-        };
-    };
-    addDocumentToVersion: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                documentId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Dodany */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
-            };
-            404: components["responses"]["NotFound"];
-        };
-    };
-    removeDocumentFromVersion: {
-        parameters: {
-            query?: never;
-            header?: never;
-            path: {
-                id: string;
-                documentId: string;
-            };
-            cookie?: never;
-        };
-        requestBody?: never;
-        responses: {
-            /** @description Usunięty */
-            204: {
-                headers: {
-                    [name: string]: unknown;
-                };
-                content?: never;
             };
             404: components["responses"]["NotFound"];
         };

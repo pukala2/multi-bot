@@ -18,6 +18,7 @@ final class DocumentEntityMapper {
         return new Document(
                 DocumentId.of(entity.getId()),
                 TenantId.of(entity.getTenantId()),
+                entity.getVersionId(),
                 StoredFileId.of(entity.getStoredFileId()),
                 entity.getFilename(),
                 entity.getMimeType(),
@@ -45,6 +46,7 @@ final class DocumentEntityMapper {
         return DocumentJpaEntity.builder()
                 .id(document.id().value())
                 .tenantId(document.tenantId().value())
+                .versionId(document.versionId())
                 .storedFileId(document.storedFileId().value())
                 .filename(document.filename())
                 .mimeType(document.mimeType())

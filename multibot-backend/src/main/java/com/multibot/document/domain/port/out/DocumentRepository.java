@@ -7,6 +7,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 
 import java.util.Optional;
+import java.util.UUID;
 
 public interface DocumentRepository {
 
@@ -15,6 +16,8 @@ public interface DocumentRepository {
     Optional<Document> findById(DocumentId id);
 
     Page<DocumentSummary> findAllSummaries(Pageable pageable);
+
+    Page<DocumentSummary> findByVersion(UUID versionId, Pageable pageable);
 
     void deleteById(DocumentId id);
 }

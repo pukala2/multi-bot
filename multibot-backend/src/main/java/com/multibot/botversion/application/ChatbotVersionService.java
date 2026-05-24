@@ -6,7 +6,6 @@ import com.multibot.botversion.domain.port.in.CreateVersionUseCase;
 import com.multibot.botversion.domain.port.in.DeleteVersionUseCase;
 import com.multibot.botversion.domain.port.in.GetActiveVersionUseCase;
 import com.multibot.botversion.domain.port.in.ListVersionsUseCase;
-import com.multibot.botversion.domain.port.in.VersionDocumentsUseCase;
 import com.multibot.botversion.domain.port.out.ChatbotVersionRepository;
 import com.multibot.shared.exception.ConflictException;
 import com.multibot.shared.exception.NotFoundException;
@@ -17,13 +16,12 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
-import java.util.Set;
 import java.util.UUID;
 
 @Service
 class ChatbotVersionService implements
         ListVersionsUseCase, CreateVersionUseCase, ActivateVersionUseCase,
-        DeleteVersionUseCase, GetActiveVersionUseCase, VersionDocumentsUseCase {
+        DeleteVersionUseCase, GetActiveVersionUseCase {
 
     private final ChatbotVersionRepository repository;
 
@@ -63,7 +61,7 @@ class ChatbotVersionService implements
         copyFromVersionId.ifPresent(sourceId -> {
             repository.findById(sourceId, tenantId)
                     .orElseThrow(() -> new NotFoundException("Source version not found: " + sourceId));
-            repository.copyDocuments(sourceId, newId);
+            repository.deepCopyVersion(sourceId, newId);
         });
 
         return repository.findById(newId, tenantId)
@@ -96,38 +94,5 @@ class ChatbotVersionService implements
             throw new ConflictException("Cannot delete active version. Activate another version first.");
         }
         repository.deleteVersion(versionId);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public Set<UUID> getDocumentIdsInVersion(UUID versionId) {
-        UUID tenantId = TenantContext.get().value();
-        repository.findById(versionId, tenantId)
-                .orElseThrow(() -> new NotFoundException("Version not found: " + versionId));
-        return repository.getDocumentIdsInVersion(versionId);
-    }
-
-    @Override
-    @Transactional
-    public void addDocument(UUID versionId, UUID documentId) {
-        UUID tenantId = TenantContext.get().value();
-        ChatbotVersion version = repository.findById(versionId, tenantId)
-                .orElseThrow(() -> new NotFoundException("Version not found: " + versionId));
-        if (version.status() == ChatbotVersion.VersionStatus.ARCHIVED) {
-            throw new ConflictException("Cannot modify archived version");
-        }
-        repository.addDocument(versionId, documentId);
-    }
-
-    @Override
-    @Transactional
-    public void removeDocument(UUID versionId, UUID documentId) {
-        UUID tenantId = TenantContext.get().value();
-        ChatbotVersion version = repository.findById(versionId, tenantId)
-                .orElseThrow(() -> new NotFoundException("Version not found: " + versionId));
-        if (version.status() == ChatbotVersion.VersionStatus.ARCHIVED) {
-            throw new ConflictException("Cannot modify archived version");
-        }
-        repository.removeDocument(versionId, documentId);
     }
 }

@@ -10,6 +10,7 @@ import java.util.UUID;
 public record Chunk(
         ChunkId id,
         TenantId tenantId,
+        UUID versionId,
         UUID documentId,
         int chunkIndex,
         String content,
@@ -21,6 +22,7 @@ public record Chunk(
     public Chunk {
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(tenantId, "tenantId");
+        Objects.requireNonNull(versionId, "versionId");
         Objects.requireNonNull(documentId, "documentId");
         Objects.requireNonNull(content, "content");
         Objects.requireNonNull(embedding, "embedding");

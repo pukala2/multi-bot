@@ -1,7 +1,6 @@
 package com.multibot.document.application;
 
 import com.multibot.botversion.domain.port.in.GetActiveVersionUseCase;
-import com.multibot.botversion.domain.port.in.VersionDocumentsUseCase;
 import com.multibot.document.domain.event.DocumentDeletedEvent;
 import com.multibot.document.domain.event.DocumentUploadedEvent;
 import com.multibot.document.domain.exception.DocumentNotFoundException;
@@ -45,22 +44,19 @@ class DocumentService implements UploadDocumentUseCase, GetDocumentUseCase, GetD
     private final DeleteChunksByDocumentUseCase deleteChunksUseCase;
     private final ApplicationEventPublisher events;
     private final GetActiveVersionUseCase getActiveVersion;
-    private final VersionDocumentsUseCase versionDocuments;
 
     DocumentService(DocumentRepository repository,
                     StoreFileUseCase storeFileUseCase,
                     DeleteFileUseCase deleteFileUseCase,
                     DeleteChunksByDocumentUseCase deleteChunksUseCase,
                     ApplicationEventPublisher events,
-                    GetActiveVersionUseCase getActiveVersion,
-                    VersionDocumentsUseCase versionDocuments) {
+                    GetActiveVersionUseCase getActiveVersion) {
         this.repository = repository;
         this.storeFileUseCase = storeFileUseCase;
         this.deleteFileUseCase = deleteFileUseCase;
         this.deleteChunksUseCase = deleteChunksUseCase;
         this.events = events;
         this.getActiveVersion = getActiveVersion;
-        this.versionDocuments = versionDocuments;
     }
 
     @Override
@@ -68,12 +64,18 @@ class DocumentService implements UploadDocumentUseCase, GetDocumentUseCase, GetD
     public Document upload(UploadDocumentCommand command) {
         TenantId tenant = TenantContext.get();
 
+        java.util.UUID versionId = command.versionId()
+                .orElseGet(() -> getActiveVersion.getActiveVersionId()
+                        .orElseThrow(() -> new IllegalStateException(
+                                "No active chatbot version for tenant " + tenant.value())));
+
         StoredFileId storedFileId = storeFileUseCase.store(
                 new StoreFileCommand(command.filename(), command.mimeType(), command.bytes()));
 
         Document document = Document.newlyUploaded(
                 DocumentId.generate(),
                 tenant,
+                versionId,
                 storedFileId,
                 command.filename(),
                 command.mimeType(),
@@ -81,9 +83,6 @@ class DocumentService implements UploadDocumentUseCase, GetDocumentUseCase, GetD
                 Instant.now());
 
         Document saved = repository.save(document);
-
-        getActiveVersion.getActiveVersionId().ifPresent(versionId ->
-                versionDocuments.addDocument(versionId, saved.id().value()));
 
         log.info("Document uploaded: id={}, filename={}, size={}B",
                 saved.id(), saved.filename(), saved.sizeBytes());
@@ -116,6 +115,12 @@ class DocumentService implements UploadDocumentUseCase, GetDocumentUseCase, GetD
     @Transactional(readOnly = true)
     public Page<DocumentSummary> list(Pageable pageable) {
         return repository.findAllSummaries(pageable);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<DocumentSummary> listByVersion(java.util.UUID versionId, Pageable pageable) {
+        return repository.findByVersion(versionId, pageable);
     }
 
     @Override
