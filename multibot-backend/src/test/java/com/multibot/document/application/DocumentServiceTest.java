@@ -1,5 +1,7 @@
 package com.multibot.document.application;
 
+import com.multibot.botversion.domain.port.in.GetActiveVersionUseCase;
+import com.multibot.botversion.domain.port.in.VersionDocumentsUseCase;
 import com.multibot.document.domain.event.DocumentDeletedEvent;
 import com.multibot.document.domain.event.DocumentUploadedEvent;
 import com.multibot.document.domain.exception.DocumentNotFoundException;
@@ -40,6 +42,8 @@ class DocumentServiceTest {
     private DeleteFileUseCase deleteFileUseCase;
     private DeleteChunksByDocumentUseCase deleteChunksUseCase;
     private ApplicationEventPublisher events;
+    private GetActiveVersionUseCase getActiveVersion;
+    private VersionDocumentsUseCase versionDocuments;
     private DocumentService service;
 
     @BeforeEach
@@ -49,8 +53,11 @@ class DocumentServiceTest {
         deleteFileUseCase = mock(DeleteFileUseCase.class);
         deleteChunksUseCase = mock(DeleteChunksByDocumentUseCase.class);
         events = mock(ApplicationEventPublisher.class);
+        getActiveVersion = mock(GetActiveVersionUseCase.class);
+        versionDocuments = mock(VersionDocumentsUseCase.class);
+        when(getActiveVersion.getActiveVersionId()).thenReturn(Optional.empty());
         service = new DocumentService(repository, storeFileUseCase, deleteFileUseCase,
-                deleteChunksUseCase, events);
+                deleteChunksUseCase, events, getActiveVersion, versionDocuments);
         TenantContext.set(TENANT);
     }
 

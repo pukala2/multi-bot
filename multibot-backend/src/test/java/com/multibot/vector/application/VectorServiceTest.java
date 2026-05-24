@@ -1,5 +1,7 @@
 package com.multibot.vector.application;
 
+import com.multibot.botversion.domain.port.in.GetActiveVersionUseCase;
+import com.multibot.botversion.domain.port.in.VersionDocumentsUseCase;
 import com.multibot.shared.tenant.TenantId;
 import com.multibot.tenancy.TenantContext;
 import com.multibot.vector.domain.model.Chunk;
@@ -16,6 +18,8 @@ import org.mockito.ArgumentCaptor;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -32,12 +36,22 @@ class VectorServiceTest {
     private static final int CANDIDATE_MULTIPLIER = 10;
 
     private ChunkStore chunkStore;
+    private GetActiveVersionUseCase getActiveVersion;
+    private VersionDocumentsUseCase versionDocuments;
     private VectorService service;
 
     @BeforeEach
     void setUp() {
         chunkStore = mock(ChunkStore.class);
-        service = new VectorService(chunkStore, new com.multibot.vector.config.VectorProperties(CANDIDATE_MULTIPLIER));
+        getActiveVersion = mock(GetActiveVersionUseCase.class);
+        versionDocuments = mock(VersionDocumentsUseCase.class);
+        UUID activeVersionId = UUID.randomUUID();
+        when(getActiveVersion.getActiveVersionId()).thenReturn(Optional.of(activeVersionId));
+        // Default: empty set means search returns []; tests that need results override via versionDocuments mock
+        when(versionDocuments.getDocumentIdsInVersion(activeVersionId)).thenReturn(Set.of());
+        service = new VectorService(chunkStore,
+                new com.multibot.vector.config.VectorProperties(CANDIDATE_MULTIPLIER),
+                getActiveVersion, versionDocuments);
         TenantContext.set(TENANT_A);
     }
 
@@ -67,8 +81,12 @@ class VectorServiceTest {
     @Test
     void search_passesCurrentTenantToStore() {
         Embedding query = randomEmbedding();
+        VectorSearchResult r1 = aResult(0.9);
+        VectorSearchResult r2 = aResult(0.8);
         when(chunkStore.search(eq(TENANT_A), eq(query), eq(50)))
-                .thenReturn(List.of(aResult(0.9), aResult(0.8)));
+                .thenReturn(List.of(r1, r2));
+        when(versionDocuments.getDocumentIdsInVersion(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(Set.of(r1.chunk().documentId(), r2.chunk().documentId()));
 
         List<VectorSearchResult> results = service.search(new VectorSearchQuery(query, 5, 0.7));
 
@@ -81,8 +99,13 @@ class VectorServiceTest {
     @Test
     void search_appliesMinScoreFilter() {
         Embedding query = randomEmbedding();
+        VectorSearchResult r1 = aResult(0.9);
+        VectorSearchResult r2 = aResult(0.6);
+        VectorSearchResult r3 = aResult(0.5);
         when(chunkStore.search(eq(TENANT_A), eq(query), eq(50)))
-                .thenReturn(List.of(aResult(0.9), aResult(0.6), aResult(0.5)));
+                .thenReturn(List.of(r1, r2, r3));
+        when(versionDocuments.getDocumentIdsInVersion(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(Set.of(r1.chunk().documentId(), r2.chunk().documentId(), r3.chunk().documentId()));
 
         List<VectorSearchResult> results = service.search(new VectorSearchQuery(query, 5, 0.7));
 
@@ -93,12 +116,29 @@ class VectorServiceTest {
     @Test
     void search_appliesTopKLimit() {
         Embedding query = randomEmbedding();
+        VectorSearchResult r1 = aResult(0.99);
+        VectorSearchResult r2 = aResult(0.95);
+        VectorSearchResult r3 = aResult(0.90);
+        VectorSearchResult r4 = aResult(0.85);
         when(chunkStore.search(eq(TENANT_A), eq(query), eq(20)))
-                .thenReturn(List.of(aResult(0.99), aResult(0.95), aResult(0.90), aResult(0.85)));
+                .thenReturn(List.of(r1, r2, r3, r4));
+        when(versionDocuments.getDocumentIdsInVersion(org.mockito.ArgumentMatchers.any()))
+                .thenReturn(Set.of(r1.chunk().documentId(), r2.chunk().documentId(),
+                        r3.chunk().documentId(), r4.chunk().documentId()));
 
         List<VectorSearchResult> results = service.search(new VectorSearchQuery(query, 2, 0.5));
 
         assertThat(results).hasSize(2);
+    }
+
+    @Test
+    void search_returnsEmpty_whenNoActiveVersion() {
+        when(getActiveVersion.getActiveVersionId()).thenReturn(Optional.empty());
+
+        List<VectorSearchResult> results = service.search(
+                new VectorSearchQuery(randomEmbedding(), 5, 0.5));
+
+        assertThat(results).isEmpty();
     }
 
     @Test

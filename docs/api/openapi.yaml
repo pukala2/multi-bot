@@ -393,6 +393,176 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/admin/versions:
+    get:
+      tags:
+        - BotVersions
+      summary: Lista wszystkich wersji bota dla tenanta
+      operationId: listVersions
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/ChatbotVersionResponse'
+    post:
+      tags:
+        - BotVersions
+      summary: Utwórz nową wersję (opcjonalnie kopiuj dokumenty z innej)
+      operationId: createVersion
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateVersionRequest'
+      responses:
+        '201':
+          description: Utworzona
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatbotVersionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/admin/versions/active:
+    get:
+      tags:
+        - BotVersions
+      summary: Pobierz aktywną wersję
+      operationId: getActiveVersion
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatbotVersionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/admin/versions/{id}:
+    delete:
+      tags:
+        - BotVersions
+      summary: Usuń wersję (nie aktywną)
+      operationId: deleteVersion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Usunięta
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/admin/versions/{id}/activate:
+    post:
+      tags:
+        - BotVersions
+      summary: Aktywuj wersję (poprzednia aktywna -> ARCHIVED)
+      operationId: activateVersion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatbotVersionResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /api/admin/versions/{id}/documents:
+    get:
+      tags:
+        - BotVersions
+      summary: Lista dokumentów w wersji
+      operationId: getVersionDocuments
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: string
+                  format: uuid
+
+  /api/admin/versions/{id}/documents/{documentId}:
+    put:
+      tags:
+        - BotVersions
+      summary: Dodaj dokument do wersji
+      operationId: addDocumentToVersion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Dodany
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      tags:
+        - BotVersions
+      summary: Usuń dokument z wersji
+      operationId: removeDocumentFromVersion
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+        - name: documentId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '204':
+          description: Usunięty
+        '404':
+          $ref: '#/components/responses/NotFound'
+
   /api/admin/rag-settings:
     get:
       tags:
@@ -925,6 +1095,44 @@ components:
       required:
         - content
         - pagination
+
+    # === Bot Versions ===
+
+    ChatbotVersionResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        status:
+          type: string
+          enum: [DRAFT, ACTIVE, ARCHIVED]
+        createdAt:
+          type: string
+          format: date-time
+        publishedAt:
+          type: string
+          format: date-time
+          nullable: true
+        documentCount:
+          type: integer
+          format: int64
+      required: [id, name, status, createdAt, documentCount]
+
+    CreateVersionRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        copyFromVersionId:
+          type: string
+          format: uuid
+          nullable: true
+      required: [name]
 
     # === RAG Settings ===
 

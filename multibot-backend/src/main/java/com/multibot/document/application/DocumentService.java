@@ -1,5 +1,7 @@
 package com.multibot.document.application;
 
+import com.multibot.botversion.domain.port.in.GetActiveVersionUseCase;
+import com.multibot.botversion.domain.port.in.VersionDocumentsUseCase;
 import com.multibot.document.domain.event.DocumentDeletedEvent;
 import com.multibot.document.domain.event.DocumentUploadedEvent;
 import com.multibot.document.domain.exception.DocumentNotFoundException;
@@ -42,17 +44,23 @@ class DocumentService implements UploadDocumentUseCase, GetDocumentUseCase, GetD
     private final DeleteFileUseCase deleteFileUseCase;
     private final DeleteChunksByDocumentUseCase deleteChunksUseCase;
     private final ApplicationEventPublisher events;
+    private final GetActiveVersionUseCase getActiveVersion;
+    private final VersionDocumentsUseCase versionDocuments;
 
     DocumentService(DocumentRepository repository,
                     StoreFileUseCase storeFileUseCase,
                     DeleteFileUseCase deleteFileUseCase,
                     DeleteChunksByDocumentUseCase deleteChunksUseCase,
-                    ApplicationEventPublisher events) {
+                    ApplicationEventPublisher events,
+                    GetActiveVersionUseCase getActiveVersion,
+                    VersionDocumentsUseCase versionDocuments) {
         this.repository = repository;
         this.storeFileUseCase = storeFileUseCase;
         this.deleteFileUseCase = deleteFileUseCase;
         this.deleteChunksUseCase = deleteChunksUseCase;
         this.events = events;
+        this.getActiveVersion = getActiveVersion;
+        this.versionDocuments = versionDocuments;
     }
 
     @Override
@@ -73,6 +81,9 @@ class DocumentService implements UploadDocumentUseCase, GetDocumentUseCase, GetD
                 Instant.now());
 
         Document saved = repository.save(document);
+
+        getActiveVersion.getActiveVersionId().ifPresent(versionId ->
+                versionDocuments.addDocument(versionId, saved.id().value()));
 
         log.info("Document uploaded: id={}, filename={}, size={}B",
                 saved.id(), saved.filename(), saved.sizeBytes());

@@ -1,7 +1,7 @@
 @ApplicationModule(
         displayName = "Vector Store",
         type = ApplicationModule.Type.OPEN,
-        allowedDependencies = {"shared", "tenancy"}
+        allowedDependencies = {"shared", "tenancy", "botversion"}
 )
 package com.multibot.vector;
 
