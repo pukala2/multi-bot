@@ -72,7 +72,6 @@ export function ChatPage() {
     }
   }, [stream.isStreaming, stream.text, stream.tokensUsed]);
 
-  const activeVersion = versions.data?.find((v) => v.status === 'ACTIVE');
   const selectedVersion = versions.data?.find((v) => v.id === selectedVersionId);
   const isTestingNonActive = selectedVersion && selectedVersion.status !== 'ACTIVE';
 
@@ -136,9 +135,6 @@ export function ChatPage() {
             <span className="text-text-muted">
               Testujesz <span className="text-text font-medium">{selectedVersion?.name}</span>{' '}
               ({selectedVersion?.status === 'DRAFT' ? 'robocza' : 'archiwum'}).
-              {activeVersion && (
-                <> Aktywna na produkcji: <span className="text-text">{activeVersion.name}</span>.</>
-              )}
             </span>
           </div>
         </Card>

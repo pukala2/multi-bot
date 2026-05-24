@@ -553,6 +553,35 @@ paths:
         '400':
           $ref: '#/components/responses/BadRequest'
 
+  /api/admin/analytics:
+    get:
+      tags:
+        - Analytics
+      summary: Pełne dane analityki dla tenanta
+      description: |
+        Zwraca komplet metryk dla wybranego okresu: overview KPI, engagement,
+        wykresy dzienne, heatmap godzin, top pytania, aktywność wersji,
+        najdłuższe sesje. Jedno zapytanie zwraca cały dashboard analityki.
+      operationId: getAnalytics
+      parameters:
+        - name: period
+          in: query
+          required: false
+          description: Okres analizy
+          schema:
+            type: string
+            enum: [D1, D7, D30, D90]
+            default: D7
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AnalyticsSnapshotResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+
   /api/admin/stats:
     get:
       tags:
@@ -1190,6 +1219,106 @@ components:
         settings:
           $ref: '#/components/schemas/WidgetSettingsResponse'
       required: [publicKey, settings]
+
+    # === Analytics ===
+
+    AnalyticsSnapshotResponse:
+      type: object
+      properties:
+        period:
+          type: string
+        overview:
+          $ref: '#/components/schemas/AnalyticsOverview'
+        engagement:
+          $ref: '#/components/schemas/AnalyticsEngagement'
+        dailyTimeseries:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyticsDailyPoint'
+        hourlyHeatmap:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyticsHeatmapCell'
+        topQuestions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyticsTopQuestion'
+        versionActivity:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyticsVersionActivity'
+        longestSessions:
+          type: array
+          items:
+            $ref: '#/components/schemas/AnalyticsLongestSession'
+      required: [period, overview, engagement, dailyTimeseries, hourlyHeatmap, topQuestions, versionActivity, longestSessions]
+
+    AnalyticsOverview:
+      type: object
+      properties:
+        sessions: { type: integer, format: int64 }
+        sessionsDeltaPercent: { type: number, format: double }
+        messages: { type: integer, format: int64 }
+        messagesDeltaPercent: { type: number, format: double }
+        tokens: { type: integer, format: int64 }
+        tokensDeltaPercent: { type: number, format: double }
+        estimatedCostUsd: { type: number, format: double }
+        uniqueUsers: { type: integer, format: int64 }
+        uniqueUsersDeltaPercent: { type: number, format: double }
+        returningUsersPercent: { type: number, format: double }
+      required: [sessions, sessionsDeltaPercent, messages, messagesDeltaPercent, tokens, tokensDeltaPercent, estimatedCostUsd, uniqueUsers, uniqueUsersDeltaPercent, returningUsersPercent]
+
+    AnalyticsEngagement:
+      type: object
+      properties:
+        avgMessagesPerSession: { type: number, format: double }
+        previousAvgMessagesPerSession: { type: number, format: double }
+        avgSessionDurationSeconds: { type: integer, format: int64 }
+      required: [avgMessagesPerSession, previousAvgMessagesPerSession, avgSessionDurationSeconds]
+
+    AnalyticsDailyPoint:
+      type: object
+      properties:
+        date: { type: string, format: date }
+        sessions: { type: integer, format: int64 }
+        messages: { type: integer, format: int64 }
+        tokens: { type: integer, format: int64 }
+      required: [date, sessions, messages, tokens]
+
+    AnalyticsHeatmapCell:
+      type: object
+      properties:
+        dayOfWeek: { type: integer, description: "1=Monday ... 7=Sunday (ISO)" }
+        hour: { type: integer }
+        count: { type: integer, format: int64 }
+      required: [dayOfWeek, hour, count]
+
+    AnalyticsTopQuestion:
+      type: object
+      properties:
+        content: { type: string }
+        occurrences: { type: integer, format: int64 }
+      required: [content, occurrences]
+
+    AnalyticsVersionActivity:
+      type: object
+      properties:
+        versionId: { type: string, format: uuid }
+        name: { type: string }
+        status: { type: string, enum: [DRAFT, ACTIVE, ARCHIVED] }
+        sessionCount: { type: integer, format: int64 }
+      required: [versionId, name, status, sessionCount]
+
+    AnalyticsLongestSession:
+      type: object
+      properties:
+        sessionId: { type: string, format: uuid }
+        anonymousId: { type: string }
+        messageCount: { type: integer, format: int64 }
+        durationSeconds: { type: integer, format: int64 }
+        tokensUsed: { type: integer, format: int64 }
+        lastActivityAt: { type: string, format: date-time }
+      required: [sessionId, anonymousId, messageCount, durationSeconds, tokensUsed, lastActivityAt]
 
     # === Admin ===
 

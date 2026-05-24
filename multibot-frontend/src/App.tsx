@@ -10,6 +10,7 @@ import { SessionsPage } from '@/pages/SessionsPage';
 import { SessionDetailPage } from '@/pages/SessionDetailPage';
 import { WidgetPage } from '@/pages/WidgetPage';
 import { SettingsPage } from '@/pages/SettingsPage';
+import { AnalyticsPage } from '@/pages/AnalyticsPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 
 const queryClient = new QueryClient({
@@ -36,16 +37,7 @@ export default function App() {
             <Route path="/sessions/:id" element={<SessionDetailPage />} />
             <Route path="/widget" element={<WidgetPage />} />
             <Route path="/settings" element={<SettingsPage />} />
-            <Route
-              path="/analytics"
-              element={
-                <PlaceholderPage
-                  title="Analityka"
-                  phaseLabel="Po MVP"
-                  description="Metryki użycia, najczęstsze pytania, koszty tokenów w czasie."
-                />
-              }
-            />
+            <Route path="/analytics" element={<AnalyticsPage />} />
             <Route
               path="*"
               element={

@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Multibot Admin · Mockup: Analityka</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg-base: #08090A;
+    --bg-panel: #111213;
+    --bg-elevated: #18191B;
+    --bg-hover: #1F2024;
+    --border: #1F2024;
+    --border-strong: #2A2C30;
+    --text: #E6E6E6;
+    --text-muted: #A0A0A8;
+    --text-dim: #6E6E76;
+    --accent: #7B5BFF;
+    --accent-dim: #5C44CC;
+    --accent-bg: rgba(123,91,255,0.10);
+    --success: #4ADE80;
+    --warning: #FBBF24;
+    --error: #F87171;
+    --info: #60A5FA;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'Inter', sans-serif;
+    background: var(--bg-base);
+    color: var(--text);
+    font-size: 14px;
+    line-height: 1.5;
+    min-height: 100vh;
+    -webkit-font-smoothing: antialiased;
+  }
+  .mono { font-family: 'JetBrains Mono', monospace; }
+  .app { display: grid; grid-template-columns: 240px 1fr; min-height: 100vh; }
+
+  /* Sidebar */
+  .sidebar { background: var(--bg-panel); border-right: 1px solid var(--border); padding: 20px 12px; }
+  .logo { display: flex; align-items: center; gap: 10px; padding: 8px 12px 20px; }
+  .logo-icon { width: 28px; height: 28px; background: linear-gradient(135deg, var(--accent), #5B7CFF); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-weight: 700; color: white; font-size: 14px; }
+  .logo-name { font-weight: 600; font-size: 15px; }
+  .nav-section { font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; padding: 16px 12px 8px; font-weight: 600; }
+  .nav-item { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 6px; color: var(--text-muted); cursor: pointer; transition: all 0.15s; font-size: 13.5px; }
+  .nav-item:hover { background: var(--bg-elevated); color: var(--text); }
+  .nav-item.active { background: var(--bg-elevated); color: var(--text); position: relative; }
+  .nav-item.active::before { content: ''; width: 3px; height: 16px; background: var(--accent); border-radius: 2px; margin-left: -12px; margin-right: 9px; position: absolute; left: 0; top: 50%; transform: translateY(-50%); }
+  .nav-icon { width: 16px; height: 16px; opacity: 0.7; }
+
+  /* Main */
+  .main { padding: 24px 32px; max-width: 1400px; width: 100%; }
+  .topbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 24px; }
+  .page-title { font-size: 22px; font-weight: 600; letter-spacing: -0.02em; }
+
+  /* Period switcher */
+  .period-switcher { display: inline-flex; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .period-switcher button { background: transparent; border: none; color: var(--text-muted); padding: 7px 14px; font-size: 13px; font-family: inherit; cursor: pointer; transition: all 0.15s; }
+  .period-switcher button:hover { background: var(--bg-elevated); color: var(--text); }
+  .period-switcher button.active { background: var(--accent-bg); color: var(--accent); }
+
+  /* Stat grid */
+  .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 20px; }
+  .stat { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px 18px; }
+  .stat-label { font-size: 12px; color: var(--text-muted); margin-bottom: 8px; }
+  .stat-value { font-size: 26px; font-weight: 600; letter-spacing: -0.02em; line-height: 1; }
+  .stat-meta { display: flex; gap: 8px; align-items: baseline; margin-top: 8px; font-size: 11.5px; }
+  .stat-delta { font-weight: 600; }
+  .stat-delta.up { color: var(--success); }
+  .stat-delta.down { color: var(--error); }
+  .stat-period { color: var(--text-dim); }
+
+  /* Card */
+  .card { background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; margin-bottom: 16px; overflow: hidden; }
+  .card-header { padding: 14px 18px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .card-title { font-size: 14px; font-weight: 600; }
+  .card-subtitle { font-size: 12px; color: var(--text-dim); margin-top: 2px; }
+  .card-body { padding: 18px; }
+
+  /* Grid layouts */
+  .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-bottom: 16px; }
+  .grid-2-3 { display: grid; grid-template-columns: 2fr 1fr; gap: 14px; margin-bottom: 16px; }
+
+  /* Bar chart */
+  .chart { display: flex; align-items: flex-end; gap: 4px; height: 180px; padding-top: 8px; }
+  .chart-bar { flex: 1; background: var(--accent); border-radius: 3px 3px 0 0; min-height: 4px; position: relative; cursor: pointer; transition: opacity 0.15s; }
+  .chart-bar:hover { opacity: 0.8; }
+  .chart-bar.dim { background: var(--accent-dim); opacity: 0.6; }
+  .chart-bar-tooltip { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); background: var(--bg-hover); border: 1px solid var(--border-strong); padding: 4px 8px; border-radius: 4px; font-size: 11px; white-space: nowrap; opacity: 0; transition: opacity 0.15s; pointer-events: none; margin-bottom: 4px; }
+  .chart-bar:hover .chart-bar-tooltip { opacity: 1; }
+  .chart-axis { display: flex; gap: 4px; margin-top: 6px; font-size: 10px; color: var(--text-dim); }
+  .chart-axis-label { flex: 1; text-align: center; }
+
+  /* Heatmap */
+  .heatmap { display: grid; grid-template-columns: 40px repeat(24, 1fr); gap: 2px; }
+  .heatmap-day { font-size: 10px; color: var(--text-dim); display: flex; align-items: center; padding-right: 6px; }
+  .heatmap-cell { aspect-ratio: 1; border-radius: 2px; background: var(--bg-elevated); cursor: pointer; transition: transform 0.15s; }
+  .heatmap-cell:hover { transform: scale(1.3); z-index: 1; }
+  .heatmap-cell.h-1 { background: rgba(123,91,255,0.15); }
+  .heatmap-cell.h-2 { background: rgba(123,91,255,0.30); }
+  .heatmap-cell.h-3 { background: rgba(123,91,255,0.50); }
+  .heatmap-cell.h-4 { background: rgba(123,91,255,0.70); }
+  .heatmap-cell.h-5 { background: rgba(123,91,255,0.90); }
+  .heatmap-header { display: grid; grid-template-columns: 40px repeat(24, 1fr); gap: 2px; font-size: 10px; color: var(--text-dim); margin-bottom: 4px; }
+  .heatmap-hour { text-align: center; }
+  .heatmap-legend { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-dim); margin-top: 10px; }
+  .heatmap-legend-bar { display: flex; gap: 2px; }
+  .heatmap-legend-bar > div { width: 14px; height: 10px; border-radius: 2px; }
+
+  /* Table */
+  table { width: 100%; border-collapse: collapse; }
+  th { text-align: left; padding: 10px 18px; font-size: 11px; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; background: var(--bg-elevated); }
+  td { padding: 12px 18px; border-top: 1px solid var(--border); font-size: 13px; }
+  td.mono { font-family: 'JetBrains Mono', monospace; font-size: 11.5px; color: var(--text-muted); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .rank { color: var(--text-dim); font-size: 11px; }
+  .badge { display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; background: var(--accent-bg); color: var(--accent); }
+
+  /* Version block */
+  .version-row { display: grid; grid-template-columns: 150px 1fr 80px; gap: 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .version-row:last-child { border-bottom: none; }
+  .version-row .name { font-weight: 500; }
+  .version-row .status { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+  .version-bar { background: var(--bg-elevated); border-radius: 4px; height: 8px; position: relative; overflow: hidden; }
+  .version-bar > div { height: 100%; background: linear-gradient(90deg, var(--accent), #5B7CFF); border-radius: 4px; }
+  .version-row .count { font-weight: 600; text-align: right; font-size: 14px; }
+  .version-row .count-sub { color: var(--text-dim); font-size: 11px; font-weight: 400; }
+
+  /* Engagement tiles */
+  .engagement { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+  .engagement-tile { background: var(--bg-elevated); border-radius: 6px; padding: 14px 16px; }
+  .engagement-label { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
+  .engagement-value { font-size: 22px; font-weight: 600; margin: 6px 0 2px; letter-spacing: -0.02em; }
+  .engagement-meta { font-size: 11.5px; color: var(--text-dim); }
+
+  .style-banner { background: var(--bg-elevated); padding: 8px 32px; font-size: 12px; color: var(--text-muted); border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+  .style-banner strong { color: var(--accent); }
+</style>
+</head>
+<body>
+<div class="style-banner">
+  <span>📊 <strong>Mockup: Analityka</strong> · dane fake do dyskusji jak by to wygladalo · Linear-style theme</span>
+  <span class="mono">mockup-analytics.html</span>
+</div>
+<div class="app">
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-icon">M</div>
+      <div class="logo-name">Multibot</div>
+    </div>
+    <div class="nav-section">Główne</div>
+    <div class="nav-item">📊 Panel</div>
+    <div class="nav-item">🤖 Bot</div>
+    <div class="nav-item">💬 Testowy czat</div>
+    <div class="nav-item">🗂 Sesje</div>
+    <div class="nav-item">⚙ Widget</div>
+    <div class="nav-section">System</div>
+    <div class="nav-item">🔧 Ustawienia</div>
+    <div class="nav-item active">📈 Analityka</div>
+    <div style="margin-top: 40vh; padding: 12px; font-size: 11px; color: var(--text-dim);" class="mono">
+      tenant: 00000000-…-0001<br/>
+      v0.1.0 · main
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="topbar">
+      <h1 class="page-title">Analityka</h1>
+      <div class="period-switcher">
+        <button>24h</button>
+        <button class="active">7d</button>
+        <button>30d</button>
+        <button>90d</button>
+        <button>custom</button>
+      </div>
+    </div>
+
+    <!-- KPI tiles -->
+    <div class="stats">
+      <div class="stat">
+        <div class="stat-label">Sesje</div>
+        <div class="stat-value">312</div>
+        <div class="stat-meta">
+          <span class="stat-delta up">↑ 18%</span>
+          <span class="stat-period">vs poprzedni tydzień</span>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Wiadomości</div>
+        <div class="stat-value">1 247</div>
+        <div class="stat-meta">
+          <span class="stat-delta up">↑ 24%</span>
+          <span class="stat-period">vs poprzedni tydzień</span>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Zużyte tokeny</div>
+        <div class="stat-value">38 412</div>
+        <div class="stat-meta">
+          <span class="stat-delta up">↑ 22%</span>
+          <span class="stat-period">~$0.19 koszt</span>
+        </div>
+      </div>
+      <div class="stat">
+        <div class="stat-label">Unikalni użytkownicy</div>
+        <div class="stat-value">187</div>
+        <div class="stat-meta">
+          <span class="stat-delta up">↑ 12%</span>
+          <span class="stat-period">42% powracający</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Engagement -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Zaangażowanie</div>
+          <div class="card-subtitle">jak długo i jak głęboko klienci rozmawiają z botem</div>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="engagement">
+          <div class="engagement-tile">
+            <div class="engagement-label">Średnio wiadomości/sesja</div>
+            <div class="engagement-value">4.2</div>
+            <div class="engagement-meta">↑ z 3.8 vs poprzedni tydzień</div>
+          </div>
+          <div class="engagement-tile">
+            <div class="engagement-label">Średni czas sesji</div>
+            <div class="engagement-value">2:47</div>
+            <div class="engagement-meta">min:sek (od pierwszej do ostatniej wiadomości)</div>
+          </div>
+          <div class="engagement-tile">
+            <div class="engagement-label">"Nie wiem" rate</div>
+            <div class="engagement-value">8.4%</div>
+            <div class="engagement-meta">↓ z 12.1% — bot wie więcej</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Charts row -->
+    <div class="grid-2">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Sesje dziennie</div>
+            <div class="card-subtitle">ostatnich 14 dni</div>
+          </div>
+          <div style="font-size: 11px; color: var(--text-dim);">peak: 67 sesji (śr. 3.5.)</div>
+        </div>
+        <div class="card-body">
+          <div class="chart">
+            <div class="chart-bar" style="height: 35%;"><span class="chart-bar-tooltip">29 sesji</span></div>
+            <div class="chart-bar" style="height: 42%;"><span class="chart-bar-tooltip">34 sesji</span></div>
+            <div class="chart-bar" style="height: 48%;"><span class="chart-bar-tooltip">38 sesji</span></div>
+            <div class="chart-bar" style="height: 55%;"><span class="chart-bar-tooltip">42 sesji</span></div>
+            <div class="chart-bar dim" style="height: 25%;"><span class="chart-bar-tooltip">18 sesji (sob)</span></div>
+            <div class="chart-bar dim" style="height: 20%;"><span class="chart-bar-tooltip">14 sesji (nd)</span></div>
+            <div class="chart-bar" style="height: 62%;"><span class="chart-bar-tooltip">47 sesji</span></div>
+            <div class="chart-bar" style="height: 75%;"><span class="chart-bar-tooltip">58 sesji</span></div>
+            <div class="chart-bar" style="height: 85%;"><span class="chart-bar-tooltip">67 sesji</span></div>
+            <div class="chart-bar" style="height: 70%;"><span class="chart-bar-tooltip">54 sesji</span></div>
+            <div class="chart-bar" style="height: 80%;"><span class="chart-bar-tooltip">62 sesji</span></div>
+            <div class="chart-bar dim" style="height: 30%;"><span class="chart-bar-tooltip">22 sesji (sob)</span></div>
+            <div class="chart-bar dim" style="height: 25%;"><span class="chart-bar-tooltip">18 sesji (nd)</span></div>
+            <div class="chart-bar" style="height: 90%;"><span class="chart-bar-tooltip">71 sesji</span></div>
+          </div>
+          <div class="chart-axis">
+            <span class="chart-axis-label">22</span>
+            <span class="chart-axis-label">23</span>
+            <span class="chart-axis-label">24</span>
+            <span class="chart-axis-label">25</span>
+            <span class="chart-axis-label">26</span>
+            <span class="chart-axis-label">27</span>
+            <span class="chart-axis-label">28</span>
+            <span class="chart-axis-label">29</span>
+            <span class="chart-axis-label">30</span>
+            <span class="chart-axis-label">31</span>
+            <span class="chart-axis-label">1</span>
+            <span class="chart-axis-label">2</span>
+            <span class="chart-axis-label">3</span>
+            <span class="chart-axis-label">4</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Tokeny / koszt dziennie</div>
+            <div class="card-subtitle">$ wg cennika Anthropic Claude Haiku</div>
+          </div>
+          <div style="font-size: 11px; color: var(--text-dim);">7d razem: ~$0.19</div>
+        </div>
+        <div class="card-body">
+          <div class="chart">
+            <div class="chart-bar" style="height: 45%; background: var(--info);"><span class="chart-bar-tooltip">4 280 tok · $0.021</span></div>
+            <div class="chart-bar" style="height: 52%; background: var(--info);"><span class="chart-bar-tooltip">5 100 tok · $0.026</span></div>
+            <div class="chart-bar" style="height: 60%; background: var(--info);"><span class="chart-bar-tooltip">5 920 tok · $0.030</span></div>
+            <div class="chart-bar" style="height: 58%; background: var(--info);"><span class="chart-bar-tooltip">5 760 tok · $0.029</span></div>
+            <div class="chart-bar dim" style="height: 25%; background: var(--info);"><span class="chart-bar-tooltip">2 410 tok</span></div>
+            <div class="chart-bar dim" style="height: 18%; background: var(--info);"><span class="chart-bar-tooltip">1 780 tok</span></div>
+            <div class="chart-bar" style="height: 70%; background: var(--info);"><span class="chart-bar-tooltip">6 940 tok · $0.035</span></div>
+            <div class="chart-bar" style="height: 78%; background: var(--info);"><span class="chart-bar-tooltip">7 720 tok · $0.039</span></div>
+            <div class="chart-bar" style="height: 88%; background: var(--info);"><span class="chart-bar-tooltip">8 680 tok · $0.043</span></div>
+            <div class="chart-bar" style="height: 72%; background: var(--info);"><span class="chart-bar-tooltip">7 130 tok · $0.036</span></div>
+            <div class="chart-bar" style="height: 82%; background: var(--info);"><span class="chart-bar-tooltip">8 120 tok · $0.041</span></div>
+            <div class="chart-bar dim" style="height: 32%; background: var(--info);"><span class="chart-bar-tooltip">3 150 tok</span></div>
+            <div class="chart-bar dim" style="height: 28%; background: var(--info);"><span class="chart-bar-tooltip">2 760 tok</span></div>
+            <div class="chart-bar" style="height: 95%; background: var(--info);"><span class="chart-bar-tooltip">9 410 tok · $0.047</span></div>
+          </div>
+          <div class="chart-axis">
+            <span class="chart-axis-label">22</span><span class="chart-axis-label">23</span><span class="chart-axis-label">24</span><span class="chart-axis-label">25</span><span class="chart-axis-label">26</span><span class="chart-axis-label">27</span><span class="chart-axis-label">28</span><span class="chart-axis-label">29</span><span class="chart-axis-label">30</span><span class="chart-axis-label">31</span><span class="chart-axis-label">1</span><span class="chart-axis-label">2</span><span class="chart-axis-label">3</span><span class="chart-axis-label">4</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Heatmap -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Aktywność: godzina × dzień tygodnia</div>
+          <div class="card-subtitle">kiedy klienci najczęściej rozmawiają — dane z ostatnich 30 dni</div>
+        </div>
+        <div style="font-size: 11px; color: var(--text-dim);">peak: pt 19:00 (87 wiadomości)</div>
+      </div>
+      <div class="card-body">
+        <div class="heatmap-header">
+          <span></span>
+          <span class="heatmap-hour">0</span><span></span><span></span><span></span>
+          <span class="heatmap-hour">4</span><span></span><span></span><span></span>
+          <span class="heatmap-hour">8</span><span></span><span></span><span></span>
+          <span class="heatmap-hour">12</span><span></span><span></span><span></span>
+          <span class="heatmap-hour">16</span><span></span><span></span><span></span>
+          <span class="heatmap-hour">20</span><span></span><span></span><span></span>
+        </div>
+        <!-- 7 dni × 24 godziny = fake heatmap -->
+        <div class="heatmap">
+          <span class="heatmap-day">pn</span>
+          <span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell"></span>
+
+          <span class="heatmap-day">wt</span>
+          <span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-5"></span><span class="heatmap-cell h-5"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-1"></span>
+
+          <span class="heatmap-day">śr</span>
+          <span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell"></span>
+
+          <span class="heatmap-day">cz</span>
+          <span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-5"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell"></span>
+
+          <span class="heatmap-day">pt</span>
+          <span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-5"></span><span class="heatmap-cell h-5"></span><span class="heatmap-cell h-5"></span><span class="heatmap-cell h-4"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-1"></span>
+
+          <span class="heatmap-day">sob</span>
+          <span class="heatmap-cell h-1"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell h-1"></span>
+
+          <span class="heatmap-day">nd</span>
+          <span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-3"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-2"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell h-1"></span><span class="heatmap-cell"></span>
+        </div>
+        <div class="heatmap-legend">
+          <span>mniej</span>
+          <div class="heatmap-legend-bar">
+            <div style="background: var(--bg-elevated);"></div>
+            <div style="background: rgba(123,91,255,0.15);"></div>
+            <div style="background: rgba(123,91,255,0.30);"></div>
+            <div style="background: rgba(123,91,255,0.50);"></div>
+            <div style="background: rgba(123,91,255,0.70);"></div>
+            <div style="background: rgba(123,91,255,0.90);"></div>
+          </div>
+          <span>więcej</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top pytania -->
+    <div class="grid-2-3">
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Najczęstsze pytania</div>
+            <div class="card-subtitle">top 10 pytań klientów — w tym tygodniu</div>
+          </div>
+          <button style="background: transparent; border: 1px solid var(--border-strong); color: var(--text-muted); padding: 5px 10px; border-radius: 6px; font-size: 12px; cursor: pointer;">Eksport CSV</button>
+        </div>
+        <table>
+          <thead>
+            <tr><th></th><th>Pytanie</th><th>Wystąpienia</th><th>"Nie wiem"</th></tr>
+          </thead>
+          <tbody>
+            <tr><td class="rank">#1</td><td>Ile kosztuje sofa Wenecja?</td><td>47</td><td><span class="badge" style="background: rgba(74,222,128,0.12); color: var(--success);">0%</span></td></tr>
+            <tr><td class="rank">#2</td><td>Jak długo trwa dostawa?</td><td>38</td><td><span class="badge" style="background: rgba(74,222,128,0.12); color: var(--success);">3%</span></td></tr>
+            <tr><td class="rank">#3</td><td>Z jakiego drewna są wasze meble?</td><td>34</td><td><span class="badge" style="background: rgba(74,222,128,0.12); color: var(--success);">0%</span></td></tr>
+            <tr><td class="rank">#4</td><td>Czy mogę zwrócić mebel po montażu?</td><td>29</td><td><span class="badge" style="background: rgba(74,222,128,0.12); color: var(--success);">0%</span></td></tr>
+            <tr><td class="rank">#5</td><td>Ile lat gwarancji?</td><td>26</td><td><span class="badge" style="background: rgba(74,222,128,0.12); color: var(--success);">4%</span></td></tr>
+            <tr><td class="rank">#6</td><td>Czy dostarczacie do Niemiec?</td><td>22</td><td><span class="badge" style="background: rgba(251,191,36,0.15); color: var(--warning);">14%</span></td></tr>
+            <tr><td class="rank">#7</td><td>Macie krzesła z dębu?</td><td>19</td><td><span class="badge" style="background: rgba(248,113,113,0.15); color: var(--error);">42%</span></td></tr>
+            <tr><td class="rank">#8</td><td>Jak działa Mebelki Klub?</td><td>17</td><td><span class="badge" style="background: rgba(74,222,128,0.12); color: var(--success);">6%</span></td></tr>
+            <tr><td class="rank">#9</td><td>Czy mogę zamówić na raty?</td><td>16</td><td><span class="badge" style="background: rgba(74,222,128,0.12); color: var(--success);">0%</span></td></tr>
+            <tr><td class="rank">#10</td><td>Jakie są godziny showroomu?</td><td>14</td><td><span class="badge" style="background: rgba(251,191,36,0.15); color: var(--warning);">21%</span></td></tr>
+          </tbody>
+        </table>
+        <div style="padding: 10px 18px; background: var(--bg-elevated); font-size: 11.5px; color: var(--text-dim);">
+          💡 Pytanie #7 ma 42% "nie wiem" — rozważ wgranie katalogu krzeseł dębowych do bota.
+        </div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <div>
+            <div class="card-title">Aktywność wersji</div>
+            <div class="card-subtitle">sesje obsłużone przez każdą wersję bota</div>
+          </div>
+        </div>
+        <div class="card-body" style="padding-top: 8px;">
+          <div class="version-row">
+            <div>
+              <div class="name">Wersja 1</div>
+              <div class="status">🟢 aktywna od 23.05</div>
+            </div>
+            <div class="version-bar"><div style="width: 87%;"></div></div>
+            <div class="count">271 <span class="count-sub">sesji</span></div>
+          </div>
+          <div class="version-row">
+            <div>
+              <div class="name">wersja 2</div>
+              <div class="status">📝 robocza · 12 sesji testowych</div>
+            </div>
+            <div class="version-bar"><div style="width: 4%;"></div></div>
+            <div class="count">12 <span class="count-sub">test</span></div>
+          </div>
+          <div class="version-row">
+            <div>
+              <div class="name">Wersja 1 (przed v2)</div>
+              <div class="status">📦 zarchiwizowana</div>
+            </div>
+            <div class="version-bar"><div style="width: 9%; background: var(--text-dim);"></div></div>
+            <div class="count">29 <span class="count-sub">sesji</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Top sesji -->
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <div class="card-title">Najdłuższe sesje</div>
+          <div class="card-subtitle">top 5 — kandydaci na dobre case studies lub wsparcie 1:1</div>
+        </div>
+      </div>
+      <table>
+        <thead>
+          <tr><th></th><th>Anonimowy ID</th><th>Wiadomości</th><th>Czas trwania</th><th>Tokeny</th><th>Ostatnia aktywność</th></tr>
+        </thead>
+        <tbody>
+          <tr><td class="rank">#1</td><td class="mono">anon-019e55bf…3f72</td><td>23</td><td>14:32</td><td>1 847</td><td>3 godz. temu</td></tr>
+          <tr><td class="rank">#2</td><td class="mono">anon-019e5b0a…7c11</td><td>18</td><td>11:08</td><td>1 412</td><td>wczoraj</td></tr>
+          <tr><td class="rank">#3</td><td class="mono">anon-019e5a17…91d4</td><td>15</td><td>9:23</td><td>1 198</td><td>wczoraj</td></tr>
+          <tr><td class="rank">#4</td><td class="mono">anon-019e58e2…b6a8</td><td>14</td><td>8:45</td><td>1 087</td><td>2 dni temu</td></tr>
+          <tr><td class="rank">#5</td><td class="mono">anon-019e572f…e421</td><td>12</td><td>7:12</td><td>967</td><td>3 dni temu</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div style="margin-top: 16px; padding: 16px; background: var(--bg-panel); border: 1px dashed var(--border-strong); border-radius: 8px; color: var(--text-dim); font-size: 12px; text-align: center;">
+      🚧 To jest mockup z fake danymi — wybierz co implementować w realnej apce
+    </div>
+  </main>
+</div>
+</body>
+</html>

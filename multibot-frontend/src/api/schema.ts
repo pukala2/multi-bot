@@ -284,6 +284,28 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/analytics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pełne dane analityki dla tenanta
+         * @description Zwraca komplet metryk dla wybranego okresu: overview KPI, engagement,
+         *     wykresy dzienne, heatmap godzin, top pytania, aktywność wersji,
+         *     najdłuższe sesje. Jedno zapytanie zwraca cały dashboard analityki.
+         */
+        get: operations["getAnalytics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/stats": {
         parameters: {
             query?: never;
@@ -675,6 +697,90 @@ export interface components {
             /** @example pk_widget_live_a1b2c3d4 */
             publicKey: string;
             settings: components["schemas"]["WidgetSettingsResponse"];
+        };
+        AnalyticsSnapshotResponse: {
+            period: string;
+            overview: components["schemas"]["AnalyticsOverview"];
+            engagement: components["schemas"]["AnalyticsEngagement"];
+            dailyTimeseries: components["schemas"]["AnalyticsDailyPoint"][];
+            hourlyHeatmap: components["schemas"]["AnalyticsHeatmapCell"][];
+            topQuestions: components["schemas"]["AnalyticsTopQuestion"][];
+            versionActivity: components["schemas"]["AnalyticsVersionActivity"][];
+            longestSessions: components["schemas"]["AnalyticsLongestSession"][];
+        };
+        AnalyticsOverview: {
+            /** Format: int64 */
+            sessions: number;
+            /** Format: double */
+            sessionsDeltaPercent: number;
+            /** Format: int64 */
+            messages: number;
+            /** Format: double */
+            messagesDeltaPercent: number;
+            /** Format: int64 */
+            tokens: number;
+            /** Format: double */
+            tokensDeltaPercent: number;
+            /** Format: double */
+            estimatedCostUsd: number;
+            /** Format: int64 */
+            uniqueUsers: number;
+            /** Format: double */
+            uniqueUsersDeltaPercent: number;
+            /** Format: double */
+            returningUsersPercent: number;
+        };
+        AnalyticsEngagement: {
+            /** Format: double */
+            avgMessagesPerSession: number;
+            /** Format: double */
+            previousAvgMessagesPerSession: number;
+            /** Format: int64 */
+            avgSessionDurationSeconds: number;
+        };
+        AnalyticsDailyPoint: {
+            /** Format: date */
+            date: string;
+            /** Format: int64 */
+            sessions: number;
+            /** Format: int64 */
+            messages: number;
+            /** Format: int64 */
+            tokens: number;
+        };
+        AnalyticsHeatmapCell: {
+            /** @description 1=Monday ... 7=Sunday (ISO) */
+            dayOfWeek: number;
+            hour: number;
+            /** Format: int64 */
+            count: number;
+        };
+        AnalyticsTopQuestion: {
+            content: string;
+            /** Format: int64 */
+            occurrences: number;
+        };
+        AnalyticsVersionActivity: {
+            /** Format: uuid */
+            versionId: string;
+            name: string;
+            /** @enum {string} */
+            status: "DRAFT" | "ACTIVE" | "ARCHIVED";
+            /** Format: int64 */
+            sessionCount: number;
+        };
+        AnalyticsLongestSession: {
+            /** Format: uuid */
+            sessionId: string;
+            anonymousId: string;
+            /** Format: int64 */
+            messageCount: number;
+            /** Format: int64 */
+            durationSeconds: number;
+            /** Format: int64 */
+            tokensUsed: number;
+            /** Format: date-time */
+            lastActivityAt: string;
         };
         AdminStatsResponse: {
             documents: components["schemas"]["DocumentStats"];
@@ -1351,6 +1457,30 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+        };
+    };
+    getAnalytics: {
+        parameters: {
+            query?: {
+                /** @description Okres analizy */
+                period?: "D1" | "D7" | "D30" | "D90";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AnalyticsSnapshotResponse"];
+                };
+            };
+            500: components["responses"]["InternalServerError"];
         };
     };
     getAdminStats: {
