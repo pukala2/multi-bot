@@ -16,7 +16,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Optional;
 import java.util.UUID;
 
 @RestController
@@ -48,8 +47,7 @@ class ChatbotVersionController implements BotVersionsApi {
 
     @Override
     public ResponseEntity<ChatbotVersionResponse> createVersion(CreateVersionRequest request) {
-        Optional<UUID> copyFrom = Optional.ofNullable(request.getCopyFromVersionId());
-        ChatbotVersion created = createUseCase.create(request.getName(), copyFrom);
+        ChatbotVersion created = createUseCase.create(request.getName(), request.getCopyFromVersionId());
         return ResponseEntity.status(HttpStatus.CREATED).body(toResponse(created));
     }
 

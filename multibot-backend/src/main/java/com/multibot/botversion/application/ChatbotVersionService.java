@@ -49,7 +49,7 @@ class ChatbotVersionService implements
 
     @Override
     @Transactional
-    public ChatbotVersion create(String name, Optional<UUID> copyFromVersionId) {
+    public ChatbotVersion create(String name, UUID copyFromVersionId) {
         UUID tenantId = TenantContext.get().value();
         if (name == null || name.isBlank() || name.length() > 120) {
             throw new ValidationException("Name is required, max 120 chars");
@@ -58,11 +58,11 @@ class ChatbotVersionService implements
         UUID newId = UUID.randomUUID();
         repository.insertDraft(newId, tenantId, name);
 
-        copyFromVersionId.ifPresent(sourceId -> {
-            repository.findById(sourceId, tenantId)
-                    .orElseThrow(() -> new NotFoundException("Source version not found: " + sourceId));
-            repository.deepCopyVersion(sourceId, newId);
-        });
+        if (copyFromVersionId != null) {
+            repository.findById(copyFromVersionId, tenantId)
+                    .orElseThrow(() -> new NotFoundException("Source version not found: " + copyFromVersionId));
+            repository.deepCopyVersion(copyFromVersionId, newId);
+        }
 
         return repository.findById(newId, tenantId)
                 .orElseThrow(() -> new IllegalStateException("Just created version not found"));
