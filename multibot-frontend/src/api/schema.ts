@@ -194,6 +194,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/rag-settings": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Pobierz ustawienia RAG dla tenanta
+         * @description Zwraca aktualne ustawienia (lub defaulty jeśli tenant nigdy nie zapisał).
+         */
+        get: operations["getRagSettings"];
+        /** Zapisz ustawienia RAG */
+        put: operations["updateRagSettings"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/stats": {
         parameters: {
             query?: never;
@@ -519,6 +540,29 @@ export interface components {
         PaginatedMessageResponse: {
             content: components["schemas"]["MessageResponse"][];
             pagination: components["schemas"]["PageMetadata"];
+        };
+        RagSettingsResponse: {
+            /**
+             * Format: double
+             * @example 0.3
+             */
+            minScore: number;
+            /** @example 5 */
+            topK: number;
+            /**
+             * Format: double
+             * @example 0.2
+             */
+            temperature: number;
+            systemPrompt?: string | null;
+        };
+        RagSettingsRequest: {
+            /** Format: double */
+            minScore: number;
+            topK: number;
+            /** Format: double */
+            temperature: number;
+            systemPrompt?: string | null;
         };
         WidgetSettingsResponse: {
             /** @example #7B5BFF */
@@ -1050,6 +1094,52 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+        };
+    };
+    getRagSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RagSettingsResponse"];
+                };
+            };
+            500: components["responses"]["InternalServerError"];
+        };
+    };
+    updateRagSettings: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RagSettingsRequest"];
+            };
+        };
+        responses: {
+            /** @description Zapisane */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RagSettingsResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
         };
     };
     getAdminStats: {

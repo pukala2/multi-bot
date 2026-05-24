@@ -8,6 +8,7 @@ import { ChatPage } from '@/pages/ChatPage';
 import { SessionsPage } from '@/pages/SessionsPage';
 import { SessionDetailPage } from '@/pages/SessionDetailPage';
 import { WidgetPage } from '@/pages/WidgetPage';
+import { SettingsPage } from '@/pages/SettingsPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 
 const queryClient = new QueryClient({
@@ -32,16 +33,7 @@ export default function App() {
             <Route path="/sessions" element={<SessionsPage />} />
             <Route path="/sessions/:id" element={<SessionDetailPage />} />
             <Route path="/widget" element={<WidgetPage />} />
-            <Route
-              path="/settings"
-              element={
-                <PlaceholderPage
-                  title="Ustawienia"
-                  phaseLabel="Po MVP"
-                  description="Dostosuj sposób działania bota: jak rygorystycznie szuka odpowiedzi, ile źródeł bierze pod uwagę, jaki styl odpowiedzi preferuje."
-                />
-              }
-            />
+            <Route path="/settings" element={<SettingsPage />} />
             <Route
               path="/analytics"
               element={

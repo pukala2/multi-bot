@@ -6,6 +6,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
+import java.util.Optional;
 
 @Component
 class PromptBuilder {
@@ -22,15 +23,24 @@ class PromptBuilder {
             - Używaj języka polskiego.
             """;
 
-    private final String systemPrompt;
+    private final String globalSystemPrompt;
 
     PromptBuilder(@Value("${multibot.rag.system-prompt:}") String systemPromptOverride) {
-        this.systemPrompt = (systemPromptOverride == null || systemPromptOverride.isBlank())
+        this.globalSystemPrompt = (systemPromptOverride == null || systemPromptOverride.isBlank())
                 ? DEFAULT_SYSTEM_PROMPT
                 : systemPromptOverride;
     }
 
     String build(List<VectorSearchResult> chunks, List<RagMessage> history, String question) {
+        return build(chunks, history, question, Optional.empty());
+    }
+
+    String build(List<VectorSearchResult> chunks, List<RagMessage> history, String question,
+                 Optional<String> tenantSystemPrompt) {
+        String systemPrompt = tenantSystemPrompt
+                .filter(p -> !p.isBlank())
+                .orElse(globalSystemPrompt);
+
         StringBuilder sb = new StringBuilder();
         sb.append(systemPrompt).append("\n\n");
 

@@ -393,6 +393,43 @@ paths:
         '404':
           $ref: '#/components/responses/NotFound'
 
+  /api/admin/rag-settings:
+    get:
+      tags:
+        - RagSettings
+      summary: Pobierz ustawienia RAG dla tenanta
+      description: Zwraca aktualne ustawienia (lub defaulty jeśli tenant nigdy nie zapisał).
+      operationId: getRagSettings
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RagSettingsResponse'
+        '500':
+          $ref: '#/components/responses/InternalServerError'
+    put:
+      tags:
+        - RagSettings
+      summary: Zapisz ustawienia RAG
+      operationId: updateRagSettings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RagSettingsRequest'
+      responses:
+        '200':
+          description: Zapisane
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RagSettingsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+
   /api/admin/stats:
     get:
       tags:
@@ -888,6 +925,57 @@ components:
       required:
         - content
         - pagination
+
+    # === RAG Settings ===
+
+    RagSettingsResponse:
+      type: object
+      properties:
+        minScore:
+          type: number
+          format: double
+          minimum: 0.0
+          maximum: 1.0
+          example: 0.3
+        topK:
+          type: integer
+          minimum: 1
+          maximum: 20
+          example: 5
+        temperature:
+          type: number
+          format: double
+          minimum: 0.0
+          maximum: 1.0
+          example: 0.2
+        systemPrompt:
+          type: string
+          nullable: true
+          maxLength: 4000
+      required: [minScore, topK, temperature]
+
+    RagSettingsRequest:
+      type: object
+      properties:
+        minScore:
+          type: number
+          format: double
+          minimum: 0.0
+          maximum: 1.0
+        topK:
+          type: integer
+          minimum: 1
+          maximum: 20
+        temperature:
+          type: number
+          format: double
+          minimum: 0.0
+          maximum: 1.0
+        systemPrompt:
+          type: string
+          nullable: true
+          maxLength: 4000
+      required: [minScore, topK, temperature]
 
     # === Widget ===
 
