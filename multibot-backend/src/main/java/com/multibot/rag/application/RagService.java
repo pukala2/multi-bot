@@ -53,7 +53,7 @@ class RagService implements AnswerQuestionUseCase {
 
         Embedding queryEmbedding = embeddingProvider.embed(query.question());
         List<VectorSearchResult> chunks = searchChunksUseCase.search(
-                new VectorSearchQuery(queryEmbedding, topK, minScore));
+                new VectorSearchQuery(queryEmbedding, topK, minScore, query.versionIdOverride()));
 
         logRetrieval(query.question(), topK, minScore, chunks);
 
@@ -77,7 +77,7 @@ class RagService implements AnswerQuestionUseCase {
 
         Embedding queryEmbedding = embeddingProvider.embed(query.question());
         List<VectorSearchResult> chunks = searchChunksUseCase.search(
-                new VectorSearchQuery(queryEmbedding, topK, minScore));
+                new VectorSearchQuery(queryEmbedding, topK, minScore, query.versionIdOverride()));
 
         logRetrieval(query.question(), topK, minScore, chunks);
 

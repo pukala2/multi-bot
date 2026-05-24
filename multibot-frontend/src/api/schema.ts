@@ -867,7 +867,10 @@ export interface operations {
     };
     uploadDocument: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Wgraj do konkretnej wersji bota (jeśli puste — aktywna wersja) */
+                versionId?: string;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1081,7 +1084,14 @@ export interface operations {
     };
     sendMessage: {
         parameters: {
-            query?: never;
+            query?: {
+                /**
+                 * @description Override aktywnej wersji bota (do testowego czatu w admin panel).
+                 *     Bot użyje dokumentów z tej wersji zamiast aktywnej.
+                 *     End-userzy (widget) nie powinni przekazywać tego parametru.
+                 */
+                versionId?: string;
+            };
             header?: never;
             path: {
                 id: string;

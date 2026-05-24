@@ -20,6 +20,7 @@ export interface StreamingState {
 interface StartStreamOptions {
   sessionId: string;
   content: string;
+  versionId?: string;
   onDone?: () => void;
 }
 
@@ -35,15 +36,19 @@ export function useStreamMessage() {
   const [state, setState] = useState<StreamingState>(INITIAL_STATE);
   const abortRef = useRef<AbortController | null>(null);
 
-  const start = useCallback(async ({ sessionId, content, onDone }: StartStreamOptions) => {
+  const start = useCallback(async ({ sessionId, content, versionId, onDone }: StartStreamOptions) => {
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
     setState({ text: '', sources: [], tokensUsed: null, isStreaming: true, error: null });
 
+    const url = versionId
+      ? `/api/chat/sessions/${sessionId}/messages?versionId=${encodeURIComponent(versionId)}`
+      : `/api/chat/sessions/${sessionId}/messages`;
+
     try {
-      await fetchEventSource(`/api/chat/sessions/${sessionId}/messages`, {
+      await fetchEventSource(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

@@ -51,14 +51,16 @@ class VectorService implements StoreChunksUseCase, SearchChunksUseCase, DeleteCh
     @Transactional(readOnly = true)
     public List<VectorSearchResult> search(VectorSearchQuery query) {
         TenantId tenant = TenantContext.get();
-        Optional<UUID> activeVersionId = getActiveVersion.getActiveVersionId();
-        if (activeVersionId.isEmpty()) {
+        UUID effectiveVersionId = query.versionIdOverride() != null
+                ? query.versionIdOverride()
+                : getActiveVersion.getActiveVersionId().orElse(null);
+        if (effectiveVersionId == null) {
             return List.of();
         }
 
         int candidateLimit = query.topK() * candidateMultiplier;
         List<VectorSearchResult> candidates = chunkStore.search(
-                tenant, activeVersionId.get(), query.queryEmbedding(), candidateLimit);
+                tenant, effectiveVersionId, query.queryEmbedding(), candidateLimit);
 
         return candidates.stream()
                 .filter(r -> r.similarity() >= query.minScore())

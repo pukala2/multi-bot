@@ -77,9 +77,9 @@ class ChatController implements ChatApi {
     }
 
     @Override
-    public ResponseEntity<MessageResponse> sendMessage(UUID id, SendMessageRequest request) {
+    public ResponseEntity<MessageResponse> sendMessage(UUID id, SendMessageRequest request, UUID versionId) {
         Message message = sendMessageUseCase.send(
-                new SendMessageCommand(ChatSessionId.of(id), request.getContent()));
+                new SendMessageCommand(ChatSessionId.of(id), request.getContent(), versionId));
         return ResponseEntity.ok(ChatApiMapper.toResponse(message));
     }
 
@@ -88,11 +88,14 @@ class ChatController implements ChatApi {
             produces = MediaType.TEXT_EVENT_STREAM_VALUE,
             consumes = MediaType.APPLICATION_JSON_VALUE
     )
-    public SseEmitter streamMessage(@PathVariable("id") UUID id, @Valid @RequestBody SendMessageRequest request) {
+    public SseEmitter streamMessage(
+            @PathVariable("id") UUID id,
+            @Valid @RequestBody SendMessageRequest request,
+            @org.springframework.web.bind.annotation.RequestParam(value = "versionId", required = false) UUID versionId) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
 
         StreamingChatResponse streaming = streamMessageUseCase.stream(
-                new SendMessageCommand(ChatSessionId.of(id), request.getContent()));
+                new SendMessageCommand(ChatSessionId.of(id), request.getContent(), versionId));
 
         StringBuilder fullText = new StringBuilder();
         AtomicInteger tokenCount = new AtomicInteger(0);

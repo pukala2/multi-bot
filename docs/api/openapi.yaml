@@ -320,6 +320,16 @@ paths:
           schema:
             type: string
             format: uuid
+        - name: versionId
+          in: query
+          required: false
+          description: |
+            Override aktywnej wersji bota (do testowego czatu w admin panel).
+            Bot użyje dokumentów z tej wersji zamiast aktywnej.
+            End-userzy (widget) nie powinni przekazywać tego parametru.
+          schema:
+            type: string
+            format: uuid
       requestBody:
         required: true
         content:

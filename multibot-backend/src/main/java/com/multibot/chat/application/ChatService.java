@@ -101,7 +101,7 @@ class ChatService implements StartSessionUseCase, SendMessageUseCase, StreamMess
                 .toList();
 
         RagAnswer answer = answerQuestionUseCase.answer(
-                new RagQuery(command.content(), history, ragOptionsFromConfig()));
+                new RagQuery(command.content(), history, ragOptionsFromConfig(), command.versionIdOverride()));
 
         List<Citation> citations = answer.citations().stream()
                 .map(this::toCitation)
@@ -132,7 +132,7 @@ class ChatService implements StartSessionUseCase, SendMessageUseCase, StreamMess
                 .toList();
 
         StreamingRagAnswer ragAnswer = answerQuestionUseCase.streamAnswer(
-                new RagQuery(command.content(), history, ragOptionsFromConfig()));
+                new RagQuery(command.content(), history, ragOptionsFromConfig(), command.versionIdOverride()));
 
         List<Citation> citations = ragAnswer.citations().stream()
                 .map(this::toCitation)
