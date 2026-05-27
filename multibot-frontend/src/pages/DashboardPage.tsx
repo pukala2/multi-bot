@@ -6,6 +6,8 @@ import { Card, CardBody, CardHeader, CardTitle, CardSubtitle } from '@/component
 import { DocumentStatusBar } from '@/components/domain/DocumentStatusBar';
 import { RecentActivity } from '@/components/domain/RecentActivity';
 import { useAdminStats } from '@/hooks/useAdminStats';
+import { useAuth } from '@/hooks/useAuth';
+import { cn } from '@/lib/cn';
 import type { ReactNode } from 'react';
 
 interface StatTileProps {
@@ -62,7 +64,9 @@ function formatCost(usd: number): string {
 
 export function DashboardPage() {
   const stats = useAdminStats();
+  const auth = useAuth();
   const data = stats.data;
+  const isSuperAdmin = auth.data?.role === 'SUPER_ADMIN';
 
   const docByStatus = data?.documents.byStatus ?? {};
   const docTotal = data?.documents.total ?? 0;
@@ -108,7 +112,7 @@ export function DashboardPage() {
         </Card>
       )}
 
-      <div className="grid grid-cols-4 gap-4 mb-4">
+      <div className={cn('grid gap-4 mb-4', isSuperAdmin ? 'grid-cols-4' : 'grid-cols-3')}>
         <StatTile
           label="Dokumenty"
           value={docTotal}
@@ -128,17 +132,19 @@ export function DashboardPage() {
           loading={stats.isPending}
         />
         <StatTile
-          label="Zużyte tokeny dziś"
-          value={(data?.tokens.today ?? 0).toLocaleString('pl-PL')}
-          meta={`${formatCost(data?.tokens.estimatedCostUsd ?? 0)} · łącznie ${(data?.tokens.total ?? 0).toLocaleString('pl-PL')}`}
-          loading={stats.isPending}
-        />
-        <StatTile
           label="Wiadomości dziś"
           value={data?.messages.today ?? 0}
           meta={`${(data?.messages.total ?? 0).toLocaleString('pl-PL')} łącznie`}
           loading={stats.isPending}
         />
+        {isSuperAdmin && (
+          <StatTile
+            label="Zużyte tokeny dziś"
+            value={(data?.tokens.today ?? 0).toLocaleString('pl-PL')}
+            meta={`${formatCost(data?.tokens.estimatedCostUsd ?? 0)} · łącznie ${(data?.tokens.total ?? 0).toLocaleString('pl-PL')}`}
+            loading={stats.isPending}
+          />
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-4">

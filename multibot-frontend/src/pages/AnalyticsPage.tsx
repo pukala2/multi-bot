@@ -5,6 +5,7 @@ import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@
 import { BarChart, type BarChartPoint } from '@/components/domain/BarChart';
 import { Heatmap } from '@/components/domain/Heatmap';
 import { useAnalytics, type AnalyticsPeriod } from '@/hooks/useAnalytics';
+import { useAuth } from '@/hooks/useAuth';
 import { shortUuid, timeAgo } from '@/lib/format';
 import { cn } from '@/lib/cn';
 
@@ -35,7 +36,9 @@ const DAY_NAMES = ['', 'poniedziałek', 'wtorek', 'środa', 'czwartek', 'piątek
 export function AnalyticsPage() {
   const [period, setPeriod] = useState<AnalyticsPeriod>('D7');
   const analytics = useAnalytics(period);
+  const auth = useAuth();
   const data = analytics.data;
+  const isSuperAdmin = auth.data?.role === 'SUPER_ADMIN';
 
   const dailySessions: BarChartPoint[] = (data?.dailyTimeseries ?? []).map((d) => {
     const date = new Date(d.date);
@@ -56,6 +59,17 @@ export function AnalyticsPage() {
       label: String(date.getDate()),
       value: d.messages,
       tooltip: `${d.date}: ${d.messages.toLocaleString('pl-PL')} wiadomości`,
+      dim: isWeekend,
+    };
+  });
+
+  const dailyTokens: BarChartPoint[] = (data?.dailyTimeseries ?? []).map((d) => {
+    const date = new Date(d.date);
+    const isWeekend = date.getDay() === 0 || date.getDay() === 6;
+    return {
+      label: String(date.getDate()),
+      value: d.tokens,
+      tooltip: `${d.date}: ${d.tokens.toLocaleString('pl-PL')} tokenów`,
       dim: isWeekend,
     };
   });
@@ -97,7 +111,7 @@ export function AnalyticsPage() {
         </div>
       ) : !data ? null : (
         <>
-          <div className="grid grid-cols-3 gap-4 mb-4">
+          <div className={cn('grid gap-4 mb-4', isSuperAdmin ? 'grid-cols-4' : 'grid-cols-3')}>
             <Card>
               <CardBody className="space-y-2">
                 <div className="text-xs text-text-muted">Sesje</div>
@@ -134,6 +148,22 @@ export function AnalyticsPage() {
                 </div>
               </CardBody>
             </Card>
+            {isSuperAdmin && (
+              <Card>
+                <CardBody className="space-y-2">
+                  <div className="text-xs text-text-muted">Zużyte tokeny</div>
+                  <div className="text-[26px] font-semibold leading-none">
+                    {data.overview.tokens.toLocaleString('pl-PL')}
+                  </div>
+                  <div className="text-[11.5px]">
+                    <span className={deltaClass(data.overview.tokensDeltaPercent)}>
+                      {formatPercent(data.overview.tokensDeltaPercent)}
+                    </span>
+                    <span className="text-text-dim ml-1">~${data.overview.estimatedCostUsd.toFixed(4)} koszt</span>
+                  </div>
+                </CardBody>
+              </Card>
+            )}
           </div>
 
           <Card className="mb-4">
@@ -176,7 +206,7 @@ export function AnalyticsPage() {
             </CardBody>
           </Card>
 
-          <div className="grid grid-cols-2 gap-4 mb-4">
+          <div className={cn('grid gap-4 mb-4', isSuperAdmin ? 'grid-cols-3' : 'grid-cols-2')}>
             <Card>
               <CardHeader>
                 <div>
@@ -199,6 +229,19 @@ export function AnalyticsPage() {
                 <BarChart data={dailyMessages} color="info" />
               </CardBody>
             </Card>
+            {isSuperAdmin && (
+              <Card>
+                <CardHeader>
+                  <div>
+                    <CardTitle>Tokeny dziennie</CardTitle>
+                    <CardSubtitle>razem: ${data.overview.estimatedCostUsd.toFixed(4)}</CardSubtitle>
+                  </div>
+                </CardHeader>
+                <CardBody>
+                  <BarChart data={dailyTokens} color="info" />
+                </CardBody>
+              </Card>
+            )}
           </div>
 
           <Card className="mb-4">
@@ -310,6 +353,7 @@ export function AnalyticsPage() {
                     <TableHead>Anonimowy ID</TableHead>
                     <TableHead>Wiadomości</TableHead>
                     <TableHead>Czas trwania</TableHead>
+                    {isSuperAdmin && <TableHead>Tokeny</TableHead>}
                     <TableHead>Ostatnia aktywność</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -320,6 +364,7 @@ export function AnalyticsPage() {
                       <TableCell className="mono text-text-muted">{shortUuid(s.anonymousId, 12, 4)}</TableCell>
                       <TableCell>{s.messageCount}</TableCell>
                       <TableCell>{formatDuration(s.durationSeconds)}</TableCell>
+                      {isSuperAdmin && <TableCell>{s.tokensUsed.toLocaleString('pl-PL')}</TableCell>}
                       <TableCell className="text-text-muted">{timeAgo(s.lastActivityAt)}</TableCell>
                     </TableRow>
                   ))}
