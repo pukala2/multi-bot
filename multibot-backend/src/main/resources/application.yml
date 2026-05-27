@@ -45,6 +45,7 @@ spring:
       - classpath:db/migration/widget
       - classpath:db/migration/rag
       - classpath:db/migration/auth
+      - classpath:db/migration/billing
 
   # ----- Spring Session (JDBC) -----
   # Sesje przechowywane w Postgres (tabele SPRING_SESSION + SPRING_SESSION_ATTRIBUTES).

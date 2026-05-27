@@ -1,5 +1,6 @@
 package com.multibot.config;
 
+import com.multibot.billing.domain.exception.MessageLimitExceededException;
 import com.multibot.shared.exception.ConflictException;
 import com.multibot.shared.exception.ForbiddenException;
 import com.multibot.shared.exception.NotFoundException;
@@ -40,6 +41,19 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ProblemDetail> handleValidation(ValidationException ex) {
         log.warn("Validation: {}", ex.getMessage());
         return problem(HttpStatus.BAD_REQUEST, "Validation Failed", ex.getMessage(), "VALIDATION_FAILED");
+    }
+
+    @ExceptionHandler(MessageLimitExceededException.class)
+    public ResponseEntity<ProblemDetail> handleMessageLimit(MessageLimitExceededException ex) {
+        log.warn("Message limit exceeded: tenant used {}/{}",
+                ex.decision().currentUsed(), ex.decision().effectiveLimit());
+        var pd = baseProblem(HttpStatus.PAYMENT_REQUIRED, "Message Limit Reached",
+                "Miesieczny limit wiadomosci zostal osiagniety. Skontaktuj sie z administratorem.",
+                "MESSAGE_LIMIT_REACHED");
+        pd.setProperty("limit", ex.decision().effectiveLimit());
+        pd.setProperty("used", ex.decision().currentUsed());
+        pd.setProperty("resetsAt", ex.decision().resetsAt().toString());
+        return ResponseEntity.status(HttpStatus.PAYMENT_REQUIRED).body(pd);
     }
 
     @ExceptionHandler(ConflictException.class)

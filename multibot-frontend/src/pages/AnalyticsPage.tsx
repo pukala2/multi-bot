@@ -49,13 +49,13 @@ export function AnalyticsPage() {
     };
   });
 
-  const dailyTokens: BarChartPoint[] = (data?.dailyTimeseries ?? []).map((d) => {
+  const dailyMessages: BarChartPoint[] = (data?.dailyTimeseries ?? []).map((d) => {
     const date = new Date(d.date);
     const isWeekend = date.getDay() === 0 || date.getDay() === 6;
     return {
       label: String(date.getDate()),
-      value: d.tokens,
-      tooltip: `${d.date}: ${d.tokens.toLocaleString('pl-PL')} tokenów`,
+      value: d.messages,
+      tooltip: `${d.date}: ${d.messages.toLocaleString('pl-PL')} wiadomości`,
       dim: isWeekend,
     };
   });
@@ -97,7 +97,7 @@ export function AnalyticsPage() {
         </div>
       ) : !data ? null : (
         <>
-          <div className="grid grid-cols-4 gap-4 mb-4">
+          <div className="grid grid-cols-3 gap-4 mb-4">
             <Card>
               <CardBody className="space-y-2">
                 <div className="text-xs text-text-muted">Sesje</div>
@@ -119,20 +119,6 @@ export function AnalyticsPage() {
                     {formatPercent(data.overview.messagesDeltaPercent)}
                   </span>
                   <span className="text-text-dim ml-1">vs poprzedni okres</span>
-                </div>
-              </CardBody>
-            </Card>
-            <Card>
-              <CardBody className="space-y-2">
-                <div className="text-xs text-text-muted">Zużyte tokeny</div>
-                <div className="text-[26px] font-semibold leading-none">
-                  {data.overview.tokens.toLocaleString('pl-PL')}
-                </div>
-                <div className="text-[11.5px]">
-                  <span className={deltaClass(data.overview.tokensDeltaPercent)}>
-                    {formatPercent(data.overview.tokensDeltaPercent)}
-                  </span>
-                  <span className="text-text-dim ml-1">~${data.overview.estimatedCostUsd.toFixed(4)} koszt</span>
                 </div>
               </CardBody>
             </Card>
@@ -178,14 +164,12 @@ export function AnalyticsPage() {
                   </div>
                 </div>
                 <div className="bg-bg-elevated rounded-md p-4">
-                  <div className="text-[11px] text-text-muted uppercase tracking-wider">Koszt jednej sesji</div>
+                  <div className="text-[11px] text-text-muted uppercase tracking-wider">Wiadomości łącznie</div>
                   <div className="text-[22px] font-semibold mt-1.5">
-                    ~${data.overview.sessions > 0
-                      ? (data.overview.estimatedCostUsd / data.overview.sessions).toFixed(4)
-                      : '0.0000'}
+                    {data.overview.messages.toLocaleString('pl-PL')}
                   </div>
                   <div className="text-[11.5px] text-text-dim mt-0.5">
-                    średnio dla {data.overview.sessions} sesji
+                    w {data.overview.sessions} sesjach
                   </div>
                 </div>
               </div>
@@ -207,12 +191,12 @@ export function AnalyticsPage() {
             <Card>
               <CardHeader>
                 <div>
-                  <CardTitle>Tokeny dziennie</CardTitle>
-                  <CardSubtitle>razem: ${data.overview.estimatedCostUsd.toFixed(4)}</CardSubtitle>
+                  <CardTitle>Wiadomości dziennie</CardTitle>
+                  <CardSubtitle>razem: {data.overview.messages.toLocaleString('pl-PL')}</CardSubtitle>
                 </div>
               </CardHeader>
               <CardBody>
-                <BarChart data={dailyTokens} color="info" />
+                <BarChart data={dailyMessages} color="info" />
               </CardBody>
             </Card>
           </div>
@@ -326,7 +310,6 @@ export function AnalyticsPage() {
                     <TableHead>Anonimowy ID</TableHead>
                     <TableHead>Wiadomości</TableHead>
                     <TableHead>Czas trwania</TableHead>
-                    <TableHead>Tokeny</TableHead>
                     <TableHead>Ostatnia aktywność</TableHead>
                   </TableRow>
                 </TableHeader>
@@ -337,7 +320,6 @@ export function AnalyticsPage() {
                       <TableCell className="mono text-text-muted">{shortUuid(s.anonymousId, 12, 4)}</TableCell>
                       <TableCell>{s.messageCount}</TableCell>
                       <TableCell>{formatDuration(s.durationSeconds)}</TableCell>
-                      <TableCell>{s.tokensUsed.toLocaleString('pl-PL')}</TableCell>
                       <TableCell className="text-text-muted">{timeAgo(s.lastActivityAt)}</TableCell>
                     </TableRow>
                   ))}

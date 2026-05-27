@@ -18,6 +18,11 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
 import org.springframework.security.web.csrf.CsrfFilter;
 import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
+import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
+
+import java.util.List;
 
 @Configuration
 @EnableWebSecurity
@@ -52,6 +57,26 @@ class SecurityConfig {
         return reg;
     }
 
+    /**
+     * CORS: widget endpointy odpowiadaja na kazde Origin (Origin check robi controller per-key
+     * z whitelistą w widget_keys.allowed_origins). Reszta API jest same-origin (admin panel
+     * + API przez Vite proxy).
+     */
+    @Bean
+    CorsConfigurationSource corsConfigurationSource() {
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
+
+        CorsConfiguration widgetCors = new CorsConfiguration();
+        widgetCors.setAllowedOriginPatterns(List.of("*"));
+        widgetCors.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
+        widgetCors.setAllowedHeaders(List.of("*"));
+        widgetCors.setAllowCredentials(false);
+        widgetCors.setMaxAge(3600L);
+        source.registerCorsConfiguration("/api/widget/**", widgetCors);
+
+        return source;
+    }
+
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http, TenantContextFilter tenantContextFilter) throws Exception {
         CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
@@ -60,6 +85,7 @@ class SecurityConfig {
         csrfHandler.setCsrfRequestAttributeName("_csrf");
 
         return http
+                .cors(c -> c.configurationSource(corsConfigurationSource()))
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfRepo)
                         .csrfTokenRequestHandler(csrfHandler)

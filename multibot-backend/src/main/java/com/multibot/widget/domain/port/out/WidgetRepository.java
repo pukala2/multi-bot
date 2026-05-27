@@ -2,6 +2,7 @@ package com.multibot.widget.domain.port.out;
 
 import com.multibot.widget.domain.model.WidgetSettings;
 
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -20,4 +21,7 @@ public interface WidgetRepository {
     Optional<UUID> findTenantIdByActiveKey(String key);
 
     void touchKey(String key);
+
+    /** Lista dozwolonych origins dla danego klucza widgeta. Pusta lista = bez ograniczen (dev). */
+    List<String> findAllowedOrigins(String key);
 }

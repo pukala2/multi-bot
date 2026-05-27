@@ -12,6 +12,7 @@ import { SessionDetailPage } from '@/pages/SessionDetailPage';
 import { WidgetPage } from '@/pages/WidgetPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { AnalyticsPage } from '@/pages/AnalyticsPage';
+import { BillingPage } from '@/pages/BillingPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 
@@ -41,6 +42,7 @@ export default function App() {
               <Route path="/sessions/:id" element={<SessionDetailPage />} />
               <Route path="/widget" element={<WidgetPage />} />
               <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/billing" element={<BillingPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
               <Route
                 path="*"

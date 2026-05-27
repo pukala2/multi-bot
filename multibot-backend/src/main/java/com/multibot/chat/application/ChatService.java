@@ -1,5 +1,9 @@
 package com.multibot.chat.application;
 
+import com.multibot.billing.domain.exception.MessageLimitExceededException;
+import com.multibot.billing.domain.model.MessageLimitDecision;
+import com.multibot.billing.domain.port.in.CheckMessageLimitUseCase;
+import com.multibot.billing.domain.port.in.IncrementUsageUseCase;
 import com.multibot.chat.domain.exception.ChatSessionNotFoundException;
 import com.multibot.chat.domain.model.ChatSession;
 import com.multibot.chat.domain.model.ChatSessionId;
@@ -42,20 +46,28 @@ import java.util.Map;
 class ChatService implements StartSessionUseCase, SendMessageUseCase, StreamMessageUseCase,
         GetSessionHistoryUseCase, ListSessionsUseCase {
 
+    private static final double COST_PER_TOKEN_USD = 0.000005;   // szacunek dla gpt-4o-mini, do dostrojenia
+
     private final ChatRepository repository;
     private final AnswerQuestionUseCase answerQuestionUseCase;
     private final GetDocumentUseCase getDocumentUseCase;
+    private final CheckMessageLimitUseCase checkMessageLimitUseCase;
+    private final IncrementUsageUseCase incrementUsageUseCase;
     private final RagProperties ragProperties;
     private final int memoryWindowSize;
 
     ChatService(ChatRepository repository,
                 AnswerQuestionUseCase answerQuestionUseCase,
                 GetDocumentUseCase getDocumentUseCase,
+                CheckMessageLimitUseCase checkMessageLimitUseCase,
+                IncrementUsageUseCase incrementUsageUseCase,
                 RagProperties ragProperties,
                 @Value("${multibot.chat.memory.window-size}") int memoryWindowSize) {
         this.repository = repository;
         this.answerQuestionUseCase = answerQuestionUseCase;
         this.getDocumentUseCase = getDocumentUseCase;
+        this.checkMessageLimitUseCase = checkMessageLimitUseCase;
+        this.incrementUsageUseCase = incrementUsageUseCase;
         this.ragProperties = ragProperties;
         this.memoryWindowSize = memoryWindowSize;
     }
@@ -91,8 +103,15 @@ class ChatService implements StartSessionUseCase, SendMessageUseCase, StreamMess
         ChatSession session = repository.findSessionById(command.sessionId())
                 .orElseThrow(() -> new ChatSessionNotFoundException(command.sessionId()));
 
+        // Billing: sprawdz limit ZANIM ruszysz LLM (zeby nie spalic tokenow ponad limit)
+        MessageLimitDecision decision = checkMessageLimitUseCase.check(tenant);
+        if (!decision.allowed()) {
+            throw new MessageLimitExceededException(decision);
+        }
+
         Message userMessage = Message.userMessage(tenant, session.id(), command.content(), Instant.now());
         repository.saveMessage(userMessage);
+        incrementUsageUseCase.incrementUserMessage(tenant);
 
         List<Message> recent = repository.findRecentMessages(session.id(), memoryWindowSize);
         List<RagMessage> history = recent.stream()
@@ -111,6 +130,9 @@ class ChatService implements StartSessionUseCase, SendMessageUseCase, StreamMess
                 tenant, session.id(), answer.text(), citations, answer.tokensUsed(), Instant.now());
         Message saved = repository.saveMessage(assistantMessage);
 
+        incrementUsageUseCase.incrementAiMessage(tenant, answer.tokensUsed(),
+                java.math.BigDecimal.valueOf(answer.tokensUsed() * COST_PER_TOKEN_USD));
+
         repository.saveSession(session.touchedAt(Instant.now()));
 
         return saved;
@@ -122,8 +144,15 @@ class ChatService implements StartSessionUseCase, SendMessageUseCase, StreamMess
         ChatSession session = repository.findSessionById(command.sessionId())
                 .orElseThrow(() -> new ChatSessionNotFoundException(command.sessionId()));
 
+        // Billing: sprawdz limit ZANIM ruszysz LLM
+        MessageLimitDecision decision = checkMessageLimitUseCase.check(tenant);
+        if (!decision.allowed()) {
+            throw new MessageLimitExceededException(decision);
+        }
+
         Message userMessage = Message.userMessage(tenant, session.id(), command.content(), Instant.now());
         repository.saveMessage(userMessage);
+        incrementUsageUseCase.incrementUserMessage(tenant);
 
         List<Message> recent = repository.findRecentMessages(session.id(), memoryWindowSize);
         List<RagMessage> history = recent.stream()
@@ -153,6 +182,8 @@ class ChatService implements StartSessionUseCase, SendMessageUseCase, StreamMess
                         citations, java.util.Optional.of(tokensUsed), now);
                 repository.saveMessage(assistantMessage);
                 repository.saveSession(session.touchedAt(now));
+                incrementUsageUseCase.incrementAiMessage(tenant, tokensUsed,
+                        java.math.BigDecimal.valueOf(tokensUsed * COST_PER_TOKEN_USD));
             } finally {
                 org.slf4j.MDC.clear();
                 TenantContext.clear();

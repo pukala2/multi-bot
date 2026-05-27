@@ -1,5 +1,5 @@
 import { NavLink } from 'react-router-dom';
-import { LayoutDashboard, Bot, MessageSquare, Inbox, Settings, BarChart3, Code, LogOut } from 'lucide-react';
+import { LayoutDashboard, Bot, MessageSquare, Inbox, Settings, BarChart3, Code, LogOut, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuth, useLogout } from '@/hooks/useAuth';
 
@@ -18,6 +18,7 @@ const NAV_GROUPS = [
     label: 'System',
     items: [
       { to: '/settings', icon: Settings, label: 'Ustawienia' },
+      { to: '/billing', icon: CreditCard, label: 'Plan i limity' },
       { to: '/analytics', icon: BarChart3, label: 'Analityka' },
     ],
   },

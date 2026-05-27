@@ -1,0 +1,71 @@
+package com.multibot.billing.infrastructure.persistence;
+
+import com.multibot.billing.domain.model.TenantUsage;
+import com.multibot.billing.domain.port.out.TenantUsageRepository;
+import com.multibot.shared.tenant.TenantId;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.stereotype.Repository;
+
+import java.math.BigDecimal;
+import java.sql.Date;
+import java.time.LocalDate;
+import java.util.List;
+
+@Repository
+class TenantUsageJdbcRepository implements TenantUsageRepository {
+
+    private final JdbcTemplate jdbc;
+
+    TenantUsageJdbcRepository(JdbcTemplate jdbc) {
+        this.jdbc = jdbc;
+    }
+
+    @Override
+    public TenantUsage findCurrent(TenantId tenantId, LocalDate periodMonth) {
+        List<TenantUsage> result = jdbc.query(
+                "SELECT tenant_id, period_month, user_messages, ai_messages, tokens_used, cost_usd " +
+                        "FROM tenant_usage WHERE tenant_id = ? AND period_month = ?",
+                (rs, rowNum) -> new TenantUsage(
+                        TenantId.of(rs.getObject("tenant_id", java.util.UUID.class)),
+                        rs.getDate("period_month").toLocalDate(),
+                        rs.getLong("user_messages"),
+                        rs.getLong("ai_messages"),
+                        rs.getLong("tokens_used"),
+                        rs.getBigDecimal("cost_usd")),
+                tenantId.value(), Date.valueOf(periodMonth));
+
+        return result.isEmpty()
+                ? TenantUsage.empty(tenantId, periodMonth)
+                : result.getFirst();
+    }
+
+    @Override
+    public long incrementUserMessages(TenantId tenantId, LocalDate periodMonth) {
+        // UPSERT z atomowym +1, RETURNING daje nowa wartosc
+        Long newValue = jdbc.queryForObject("""
+                INSERT INTO tenant_usage (tenant_id, period_month, user_messages, created_at, updated_at)
+                VALUES (?, ?, 1, now(), now())
+                ON CONFLICT (tenant_id, period_month) DO UPDATE
+                SET user_messages = tenant_usage.user_messages + 1,
+                    updated_at = now()
+                RETURNING user_messages
+                """,
+                Long.class,
+                tenantId.value(), Date.valueOf(periodMonth));
+        return newValue == null ? 0L : newValue;
+    }
+
+    @Override
+    public void incrementAiMessages(TenantId tenantId, LocalDate periodMonth, long tokensUsed, BigDecimal costUsd) {
+        jdbc.update("""
+                INSERT INTO tenant_usage (tenant_id, period_month, ai_messages, tokens_used, cost_usd, created_at, updated_at)
+                VALUES (?, ?, 1, ?, ?, now(), now())
+                ON CONFLICT (tenant_id, period_month) DO UPDATE
+                SET ai_messages = tenant_usage.ai_messages + 1,
+                    tokens_used = tenant_usage.tokens_used + EXCLUDED.tokens_used,
+                    cost_usd = tenant_usage.cost_usd + EXCLUDED.cost_usd,
+                    updated_at = now()
+                """,
+                tenantId.value(), Date.valueOf(periodMonth), tokensUsed, costUsd);
+    }
+}

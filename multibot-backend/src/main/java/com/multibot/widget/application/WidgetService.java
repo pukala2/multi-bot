@@ -12,6 +12,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.security.SecureRandom;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.UUID;
@@ -45,6 +46,21 @@ class WidgetService implements GetWidgetConfigUseCase, UpdateWidgetSettingsUseCa
                     repository.touchKey(key);
                     return repository.findSettings(tenantId).orElseGet(WidgetSettings::defaults);
                 });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public boolean isOriginAllowed(String key, String origin) {
+        List<String> allowed = repository.findAllowedOrigins(key);
+        if (allowed.isEmpty()) return true;     // pusta lista = bez ograniczen (dev)
+        if (origin == null || origin.isBlank()) return false;
+        return allowed.contains(origin);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> getAllowedOrigins(String key) {
+        return repository.findAllowedOrigins(key);
     }
 
     @Override

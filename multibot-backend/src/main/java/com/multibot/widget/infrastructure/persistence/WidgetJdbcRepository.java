@@ -6,8 +6,11 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
 
+import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.util.Arrays;
+import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -90,6 +93,22 @@ class WidgetJdbcRepository implements WidgetRepository {
     @Override
     public void touchKey(String key) {
         jdbc.update("UPDATE widget_keys SET last_used_at = NOW() WHERE key = ?", key);
+    }
+
+    @Override
+    public List<String> findAllowedOrigins(String key) {
+        try {
+            String[] origins = jdbc.queryForObject(
+                    "SELECT allowed_origins FROM widget_keys WHERE key = ? AND is_active = true",
+                    (rs, rowNum) -> {
+                        Array array = rs.getArray("allowed_origins");
+                        return array == null ? new String[0] : (String[]) array.getArray();
+                    },
+                    key);
+            return origins == null ? List.of() : Arrays.asList(origins);
+        } catch (EmptyResultDataAccessException e) {
+            return List.of();
+        }
     }
 
     private WidgetSettings mapSettings(ResultSet rs, int rowNum) throws SQLException {

@@ -35,6 +35,20 @@ export async function streamMessage(
     signal,
   });
 
+  if (response.status === 402) {
+    // Tenant przekroczyl miesieczny limit wiadomosci
+    try {
+      const body = await response.json() as { resetsAt?: string };
+      const resetDate = body.resetsAt
+        ? new Date(body.resetsAt).toLocaleDateString('pl-PL', { day: 'numeric', month: 'long' })
+        : '1. dnia następnego miesiąca';
+      handlers.onError(`Asystent będzie dostępny ponownie ${resetDate}. W międzyczasie skontaktuj się z nami innym kanałem.`);
+    } catch {
+      handlers.onError('Asystent czasowo niedostępny.');
+    }
+    return;
+  }
+
   if (!response.ok || !response.body) {
     handlers.onError(`HTTP ${response.status}`);
     return;
