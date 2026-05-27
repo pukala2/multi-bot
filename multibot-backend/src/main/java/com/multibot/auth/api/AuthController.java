@@ -3,7 +3,6 @@ package com.multibot.auth.api;
 import com.multibot.auth.domain.model.User;
 import com.multibot.auth.domain.port.out.UserRepository;
 import com.multibot.auth.infrastructure.security.MultibotUserDetails;
-import com.multibot.shared.tenant.TenantId;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -96,8 +95,8 @@ class AuthController {
         body.put("email", user.email());
         body.put("role", user.role().name());
         body.put("status", user.status().name());
-        body.put("tenantId", user.tenantId().map(TenantId::value).map(Object::toString).orElse(null));
-        body.put("lastLoginAt", user.lastLoginAt().map(Instant::toString).orElse(null));
+        body.put("tenantId", user.tenantId() == null ? null : user.tenantId().value().toString());
+        body.put("lastLoginAt", user.lastLoginAt() == null ? null : user.lastLoginAt().toString());
         return body;
     }
 

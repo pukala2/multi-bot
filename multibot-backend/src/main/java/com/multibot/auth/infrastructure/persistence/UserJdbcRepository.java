@@ -47,6 +47,10 @@ class UserJdbcRepository implements UserRepository {
 
     @Override
     public User save(User user) {
+        UUID tenantUuid = user.tenantId() == null ? null : user.tenantId().value();
+        UUID createdByUuid = user.createdBy() == null ? null : user.createdBy().value();
+        Timestamp lastLoginTs = user.lastLoginAt() == null ? null : Timestamp.from(user.lastLoginAt());
+
         int updated = jdbc.update(
                 "UPDATE users SET email = ?, password_hash = ?, role = ?, status = ?, " +
                         "tenant_id = ?, created_by = ?, updated_at = ?, last_login_at = ? " +
@@ -55,10 +59,10 @@ class UserJdbcRepository implements UserRepository {
                 user.passwordHash(),
                 user.role().name(),
                 user.status().name(),
-                user.tenantId().map(TenantId::value).orElse(null),
-                user.createdBy().map(UserId::value).orElse(null),
+                tenantUuid,
+                createdByUuid,
                 Timestamp.from(user.updatedAt()),
-                user.lastLoginAt().map(Timestamp::from).orElse(null),
+                lastLoginTs,
                 user.id().value());
 
         if (updated == 0) {
@@ -71,11 +75,11 @@ class UserJdbcRepository implements UserRepository {
                     user.passwordHash(),
                     user.role().name(),
                     user.status().name(),
-                    user.tenantId().map(TenantId::value).orElse(null),
-                    user.createdBy().map(UserId::value).orElse(null),
+                    tenantUuid,
+                    createdByUuid,
                     Timestamp.from(user.createdAt()),
                     Timestamp.from(user.updatedAt()),
-                    user.lastLoginAt().map(Timestamp::from).orElse(null));
+                    lastLoginTs);
         }
         return user;
     }
@@ -99,11 +103,11 @@ class UserJdbcRepository implements UserRepository {
                     rs.getString("password_hash"),
                     Role.valueOf(rs.getString("role")),
                     UserStatus.valueOf(rs.getString("status")),
-                    Optional.ofNullable(tenantUuid).map(TenantId::of),
-                    Optional.ofNullable(createdByUuid).map(UserId::of),
+                    tenantUuid == null ? null : TenantId.of(tenantUuid),
+                    createdByUuid == null ? null : UserId.of(createdByUuid),
                     rs.getTimestamp("created_at").toInstant(),
                     rs.getTimestamp("updated_at").toInstant(),
-                    Optional.ofNullable(lastLogin).map(Timestamp::toInstant));
+                    lastLogin == null ? null : lastLogin.toInstant());
         };
     }
 }

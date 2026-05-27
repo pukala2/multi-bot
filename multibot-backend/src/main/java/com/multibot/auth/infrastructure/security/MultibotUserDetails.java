@@ -37,7 +37,7 @@ public final class MultibotUserDetails implements UserDetails, Serializable {
         this.passwordHash = user.passwordHash();
         this.role = user.role();
         this.status = user.status();
-        this.tenantId = user.tenantId().map(TenantId::value).orElse(null);
+        this.tenantId = user.tenantId() == null ? null : user.tenantId().value();
     }
 
     public UserId userId() {
