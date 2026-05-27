@@ -15,7 +15,7 @@ import org.springframework.web.filter.OncePerRequestFilter;
 import java.io.IOException;
 
 @Component
-@Order(Ordered.HIGHEST_PRECEDENCE + 10)
+@Order(Ordered.HIGHEST_PRECEDENCE + 200)   // PO Spring Security (DEFAULT_FILTER_ORDER = +100), zeby SecurityContext byl juz ustawiony
 public class TenantContextFilter extends OncePerRequestFilter {
 
     public static final String MDC_KEY = "tenantId";

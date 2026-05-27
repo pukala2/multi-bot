@@ -1,5 +1,6 @@
 import { useRef, useState, useCallback } from 'react';
 import { fetchEventSource, EventStreamContentType } from '@microsoft/fetch-event-source';
+import { readCookie } from '@/api/client';
 
 export interface ChatSource {
   chunkId?: string;
@@ -47,15 +48,20 @@ export function useStreamMessage() {
       ? `/api/chat/sessions/${sessionId}/messages?versionId=${encodeURIComponent(versionId)}`
       : `/api/chat/sessions/${sessionId}/messages`;
 
+    const csrfToken = readCookie('XSRF-TOKEN');
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'text/event-stream',
+    };
+    if (csrfToken) headers['X-XSRF-TOKEN'] = csrfToken;
+
     try {
       await fetchEventSource(url, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: 'text/event-stream',
-        },
+        headers,
         body: JSON.stringify({ content }),
         signal: controller.signal,
+        credentials: 'same-origin',
         openWhenHidden: true,
         async onopen(response) {
           if (response.ok && response.headers.get('content-type')?.startsWith(EventStreamContentType)) {

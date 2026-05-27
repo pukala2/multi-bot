@@ -2,6 +2,7 @@ import { BrowserRouter, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { AppShell } from '@/components/layout/AppShell';
+import { ProtectedRoute } from '@/components/auth/ProtectedRoute';
 import { DashboardPage } from '@/pages/DashboardPage';
 import { DocumentsPage } from '@/pages/DocumentsPage';
 import { BotPage } from '@/pages/BotPage';
@@ -11,6 +12,7 @@ import { SessionDetailPage } from '@/pages/SessionDetailPage';
 import { WidgetPage } from '@/pages/WidgetPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { AnalyticsPage } from '@/pages/AnalyticsPage';
+import { LoginPage } from '@/pages/LoginPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 
 const queryClient = new QueryClient({
@@ -28,26 +30,29 @@ export default function App() {
     <QueryClientProvider client={queryClient}>
       <BrowserRouter>
         <Routes>
-          <Route element={<AppShell />}>
-            <Route path="/" element={<DashboardPage />} />
-            <Route path="/bot" element={<BotPage />} />
-            <Route path="/documents" element={<DocumentsPage />} />
-            <Route path="/chat" element={<ChatPage />} />
-            <Route path="/sessions" element={<SessionsPage />} />
-            <Route path="/sessions/:id" element={<SessionDetailPage />} />
-            <Route path="/widget" element={<WidgetPage />} />
-            <Route path="/settings" element={<SettingsPage />} />
-            <Route path="/analytics" element={<AnalyticsPage />} />
-            <Route
-              path="*"
-              element={
-                <PlaceholderPage
-                  title="404"
-                  phaseLabel="Nie znaleziono"
-                  description="Tej strony nie ma. Wróć do panelu albo sprawdź pasek adresu."
-                />
-              }
-            />
+          <Route path="/login" element={<LoginPage />} />
+          <Route element={<ProtectedRoute />}>
+            <Route element={<AppShell />}>
+              <Route path="/" element={<DashboardPage />} />
+              <Route path="/bot" element={<BotPage />} />
+              <Route path="/documents" element={<DocumentsPage />} />
+              <Route path="/chat" element={<ChatPage />} />
+              <Route path="/sessions" element={<SessionsPage />} />
+              <Route path="/sessions/:id" element={<SessionDetailPage />} />
+              <Route path="/widget" element={<WidgetPage />} />
+              <Route path="/settings" element={<SettingsPage />} />
+              <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route
+                path="*"
+                element={
+                  <PlaceholderPage
+                    title="404"
+                    phaseLabel="Nie znaleziono"
+                    description="Tej strony nie ma. Wróć do panelu albo sprawdź pasek adresu."
+                  />
+                }
+              />
+            </Route>
           </Route>
         </Routes>
       </BrowserRouter>

@@ -44,6 +44,16 @@ spring:
       - classpath:db/migration/chat
       - classpath:db/migration/widget
       - classpath:db/migration/rag
+      - classpath:db/migration/auth
+
+  # ----- Spring Session (JDBC) -----
+  # Sesje przechowywane w Postgres (tabele SPRING_SESSION + SPRING_SESSION_ATTRIBUTES).
+  # Przezywaja restart aplikacji. Po MVP mozna zmienic na redis.
+  session:
+    store-type: jdbc
+    timeout: 7d
+    jdbc:
+      initialize-schema: never        # zarządza tym Flyway
 
   # ----- Multipart (upload plików) -----
   servlet:
@@ -91,7 +101,16 @@ spring:
 multibot:
 
   tenancy:
-    mode: mock                     # mock | jwt | header
+    mode: auth                     # auth | mock — auth czyta z SecurityContext, mock zwraca DEFAULT_TENANT
+
+  bootstrap:
+    superadmin:
+      email:    ${MULTIBOT_SUPERADMIN_EMAIL:superadmin@multibot.local}
+      password: ${MULTIBOT_SUPERADMIN_PASSWORD:Multibot!2026}
+    default-tenant:
+      enabled:        ${MULTIBOT_DEFAULT_TENANT_BOOTSTRAP:true}
+      owner-email:    ${MULTIBOT_DEMO_OWNER_EMAIL:owner@demo.local}
+      owner-password: ${MULTIBOT_DEMO_OWNER_PASSWORD:Demo!Owner2026}
 
   file:
     storage:
