@@ -1,9 +1,22 @@
 import { NavLink } from 'react-router-dom';
+import type { LucideIcon } from 'lucide-react';
 import { LayoutDashboard, Bot, MessageSquare, Inbox, Settings, BarChart3, Code, LogOut, CreditCard } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { useAuth, useLogout } from '@/hooks/useAuth';
+import { useAuth, useLogout, type UserRole } from '@/hooks/useAuth';
 
-const NAV_GROUPS = [
+interface NavItem {
+  to: string;
+  icon: LucideIcon;
+  label: string;
+  hiddenFor?: UserRole[];
+}
+
+interface NavGroup {
+  label: string;
+  items: NavItem[];
+}
+
+const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Główne',
     items: [
@@ -18,7 +31,9 @@ const NAV_GROUPS = [
     label: 'System',
     items: [
       { to: '/settings', icon: Settings, label: 'Ustawienia' },
-      { to: '/billing', icon: CreditCard, label: 'Plan i limity' },
+      // Plan i limity to feature per-tenant — super admin (bez tenanta) tego nie ma.
+      // Cross-tenant overview pojawi się w Fazie D.
+      { to: '/billing', icon: CreditCard, label: 'Plan i limity', hiddenFor: ['SUPER_ADMIN'] },
       { to: '/analytics', icon: BarChart3, label: 'Analityka' },
     ],
   },
@@ -43,12 +58,17 @@ export function Sidebar() {
         <span className="font-semibold text-[15px]">Multibot</span>
       </div>
 
-      {NAV_GROUPS.map((group) => (
+      {NAV_GROUPS.map((group) => {
+        const visibleItems = group.items.filter(
+          (item) => !item.hiddenFor || !user || !item.hiddenFor.includes(user.role)
+        );
+        if (visibleItems.length === 0) return null;
+        return (
         <div key={group.label}>
           <div className="px-3 pt-4 pb-2 text-[11px] uppercase tracking-wider text-text-dim font-semibold">
             {group.label}
           </div>
-          {group.items.map((item) => (
+          {visibleItems.map((item) => (
             <NavLink
               key={item.to}
               to={item.to}
@@ -74,7 +94,8 @@ export function Sidebar() {
             </NavLink>
           ))}
         </div>
-      ))}
+        );
+      })}
 
       <div className="mt-auto pt-4 border-t border-border space-y-3">
         {user && (

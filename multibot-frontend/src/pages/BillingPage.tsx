@@ -2,6 +2,7 @@ import { Topbar } from '@/components/layout/Topbar';
 import { Card, CardBody, CardHeader, CardTitle, CardSubtitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { useBillingUsage, useBillingPlan } from '@/hooks/useBilling';
+import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/cn';
 
 function formatDate(iso: string): string {
@@ -9,8 +10,24 @@ function formatDate(iso: string): string {
 }
 
 export function BillingPage() {
+  const auth = useAuth();
   const usage = useBillingUsage();
   const plan = useBillingPlan();
+
+  // Super admin nie ma tenanta = nie ma planu. Cross-tenant overview pojawi sie w Fazie D.
+  if (auth.data?.role === 'SUPER_ADMIN') {
+    return (
+      <>
+        <Topbar title="Plan i limity" />
+        <Card>
+          <CardBody className="text-text-muted text-[13px] py-8 text-center">
+            Jako super admin nie masz wlasnego planu — to widok per-klient.<br/>
+            Wkrótce: lista wszystkich klientów + ich plany w panelu super admina.
+          </CardBody>
+        </Card>
+      </>
+    );
+  }
 
   if (usage.isPending || plan.isPending) {
     return (
