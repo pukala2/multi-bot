@@ -1,0 +1,23 @@
+# =============================================================================
+# Profile: prod (serwer)
+# Wartosci wrazliwe (DB, klucze API, sekrety) przychodza z env vars (docker-compose).
+# Bazowy application.yml juz czyta env: DB_URL/USER/PASSWORD, ANTHROPIC/OPENAI key,
+# bootstrap.*, security.rate-limit.*, turnstile.* — tu tylko nadpisania prod.
+# =============================================================================
+
+spring:
+  jpa:
+    show-sql: false
+
+# Swagger / API docs wylaczone na produkcji (publiczny serwer)
+springdoc:
+  swagger-ui:
+    enabled: false
+  api-docs:
+    enabled: false
+
+logging:
+  level:
+    root: INFO
+    com.multibot: INFO              # mniej gadatliwie niz dev (tam DEBUG)
+    org.hibernate.SQL: WARN

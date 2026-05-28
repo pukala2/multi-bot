@@ -1,0 +1,27 @@
+# Caddy — domena z env DOMAIN. Auto HTTPS (Let's Encrypt) na pierwszym starcie.
+# Wymaga: DNS wskazuje na serwer + porty 80/443 otwarte.
+
+{$DOMAIN} {
+	# Widget bundle (statyczny JS) — serwowany z /widget/embed.js
+	handle /widget/* {
+		root * /srv
+		file_server
+	}
+
+	# Backend API + health -> reverse proxy do kontenera backend
+	handle /api/* {
+		reverse_proxy backend:8080
+	}
+	handle /actuator/* {
+		reverse_proxy backend:8080
+	}
+
+	# Reszta -> panel admina (SPA, fallback na index.html dla React Router)
+	handle {
+		root * /srv/app
+		try_files {path} /index.html
+		file_server
+	}
+
+	encode gzip
+}

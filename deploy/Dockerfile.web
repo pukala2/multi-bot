@@ -1,0 +1,30 @@
+# Web — buduje panel admina (frontend) + widget, serwuje przez Caddy.
+# Caddy = automatyczny HTTPS (Let's Encrypt) + reverse proxy do backendu.
+# build context = root repo.
+# node:22 (debian, glibc) — NIE alpine, bo lightningcss/esbuild maja natywne binarki glibc.
+
+# ---------- frontend (panel admina) ----------
+FROM node:22 AS fe-build
+WORKDIR /fe
+COPY multibot-frontend/package.json multibot-frontend/package-lock.json ./
+RUN npm ci
+COPY multibot-frontend/ ./
+# FE wola API relatywnie (/api) -> ten sam origin -> Caddy proxuje do backendu.
+RUN npm run build
+# output: /fe/dist
+
+# ---------- widget ----------
+FROM node:22 AS widget-build
+WORKDIR /w
+COPY multibot-widget/package.json multibot-widget/package-lock.json ./
+RUN npm ci
+COPY multibot-widget/ ./
+RUN npm run build
+# output: /w/dist/embed.js
+
+# ---------- Caddy (static + reverse proxy + auto HTTPS) ----------
+FROM caddy:2-alpine
+COPY --from=fe-build /fe/dist /srv/app
+COPY --from=widget-build /w/dist/embed.js /srv/widget/embed.js
+COPY deploy/Caddyfile /etc/caddy/Caddyfile
+EXPOSE 80 443

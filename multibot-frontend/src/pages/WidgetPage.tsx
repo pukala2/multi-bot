@@ -13,13 +13,18 @@ import type { components } from '@/api/schema';
 type Position = 'bottom-right' | 'bottom-left';
 type Settings = components['schemas']['WidgetSettingsRequest'];
 
-const WIDGET_SCRIPT_URL = 'http://localhost:8080/widget/embed.js';
+// Bazuje na aktualnym origin panelu: dev -> localhost:5173 (ale widget i tak z :8080),
+// prod -> https://twoja-domena. Caddy serwuje widget i API z tego samego origin co panel,
+// wiec window.location.origin jest poprawnym hostem dla embed + api-url.
+// W dev nadpisujemy na :8080 (bo tam stoi backend serwujacy widget).
+const WIDGET_HOST = import.meta.env.DEV ? 'http://localhost:8080' : window.location.origin;
 
 function buildSnippet(publicKey: string): string {
   return `<script
-  src="${WIDGET_SCRIPT_URL}"
+  src="${WIDGET_HOST}/widget/embed.js"
   data-multibot-widget
   data-key="${publicKey}"
+  data-api-url="${WIDGET_HOST}"
 ></script>`;
 }
 

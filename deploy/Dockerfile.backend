@@ -1,0 +1,25 @@
+# Backend — multi-stage build.
+# UWAGA: build context = root repo (bo openapi-generator czyta ../docs/api/openapi.yaml
+# wzgledem multibot-backend, wiec musimy zachowac strukture katalogow).
+# NIE kopiujemy firmowego ~/.m2/settings.xml — kontener uzywa Maven Central.
+
+# ---------- build ----------
+FROM maven:3.9-eclipse-temurin-21 AS build
+WORKDIR /build
+
+# Zachowaj strukture: /build/multibot-backend + /build/docs (openapi-generator inputSpec = ../docs/api)
+COPY multibot-backend/pom.xml multibot-backend/pom.xml
+COPY docs/api/openapi.yaml docs/api/openapi.yaml
+COPY multibot-backend/src multibot-backend/src
+
+WORKDIR /build/multibot-backend
+# Cache .m2 miedzy buildami (BuildKit). Pierwszy build sciaga zaleznosci, kolejne z cache.
+RUN --mount=type=cache,target=/root/.m2 mvn -B -DskipTests clean package
+
+# ---------- runtime ----------
+FROM eclipse-temurin:21-jre
+WORKDIR /app
+COPY --from=build /build/multibot-backend/target/*.jar app.jar
+EXPOSE 8080
+# MaxRAMPercentage: JVM bierze max 70% RAM kontenera (reszta dla Postgresa/OS na 4GB boxie)
+ENTRYPOINT ["java", "-XX:MaxRAMPercentage=70.0", "-jar", "app.jar"]

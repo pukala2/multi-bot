@@ -1,0 +1,77 @@
+# Produkcyjny compose. Uruchamiany z roota repo:
+#   docker compose -f deploy/docker-compose.prod.yml --env-file deploy/.env up -d --build
+#
+# Serwisy:
+#   postgres  — baza (pgvector), NIE exposed na zewnatrz
+#   backend   — Spring Boot, internal :8080 (Caddy go proxuje)
+#   web       — Caddy: panel + widget + reverse proxy + HTTPS, exposed :80/:443
+
+services:
+
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: multibot-postgres
+    environment:
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.backend
+    container_name: multibot-backend
+    environment:
+      SPRING_PROFILES_ACTIVE: prod
+      DB_URL: jdbc:postgresql://postgres:5432/${DB_NAME}
+      DB_USER: ${DB_USER}
+      DB_PASSWORD: ${DB_PASSWORD}
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      MULTIBOT_SUPERADMIN_EMAIL: ${MULTIBOT_SUPERADMIN_EMAIL}
+      MULTIBOT_SUPERADMIN_PASSWORD: ${MULTIBOT_SUPERADMIN_PASSWORD}
+      MULTIBOT_DEFAULT_TENANT_BOOTSTRAP: ${MULTIBOT_DEFAULT_TENANT_BOOTSTRAP:-true}
+      MULTIBOT_DEMO_OWNER_EMAIL: ${MULTIBOT_DEMO_OWNER_EMAIL}
+      MULTIBOT_DEMO_OWNER_PASSWORD: ${MULTIBOT_DEMO_OWNER_PASSWORD}
+      MULTIBOT_TURNSTILE_ENABLED: ${MULTIBOT_TURNSTILE_ENABLED:-false}
+      MULTIBOT_TURNSTILE_SITE_KEY: ${MULTIBOT_TURNSTILE_SITE_KEY:-}
+      MULTIBOT_TURNSTILE_SECRET_KEY: ${MULTIBOT_TURNSTILE_SECRET_KEY:-}
+      MULTIBOT_RATE_LIMIT_IP: ${MULTIBOT_RATE_LIMIT_IP:-80}
+      MULTIBOT_RATE_LIMIT_SESSION: ${MULTIBOT_RATE_LIMIT_SESSION:-60}
+    volumes:
+      - storage:/app/storage
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+    container_name: multibot-web
+    environment:
+      DOMAIN: ${DOMAIN}
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - caddy_data:/data      # certyfikaty Let's Encrypt (persistent!)
+      - caddy_config:/config
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  storage:
+  caddy_data:
+  caddy_config:
