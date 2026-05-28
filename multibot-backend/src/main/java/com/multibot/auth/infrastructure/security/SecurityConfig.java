@@ -59,27 +59,29 @@ class SecurityConfig {
     }
 
     /**
-     * CORS: widget endpointy odpowiadaja na kazde Origin (Origin check robi controller per-key
-     * z whitelistą w widget_keys.allowed_origins). Reszta API jest same-origin (admin panel
-     * + API przez Vite proxy).
+     * CORS dla CALEGO /api/**.
+     *
+     * Za reverse proxy (Caddy) backend widzi inny host niz Origin przegladarki, wiec Spring
+     * traktuje KAZDY request z naglowkiem Origin (browser wysyla go na POST) jako cross-origin.
+     * Bez configu dla danej sciezki Spring odrzuca "Invalid CORS request" (403) — to blokowalo
+     * logowanie admina przez przegladarke.
+     *
+     * allowedOriginPatterns("*") + allowCredentials(true): Spring odbija faktyczny Origin
+     * (nie literalna gwiazdke), wiec cookies admina dzialaja. Bezpieczenstwo nadal trzymaja:
+     * CSRF token (X-XSRF-TOKEN, nieczytelny cross-origin), SameSite=Lax na cookie sesji,
+     * oraz WidgetGuardFilter (per-key + origin whitelist) na endpointach widgeta.
      */
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
+        CorsConfiguration cors = new CorsConfiguration();
+        cors.setAllowedOriginPatterns(List.of("*"));
+        cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        cors.setAllowedHeaders(List.of("*"));
+        cors.setAllowCredentials(true);
+        cors.setMaxAge(3600L);
+
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-
-        // Widget odpowiada na kazde Origin (per-key whitelist egzekwuje WidgetGuardFilter / controller).
-        CorsConfiguration widgetCors = new CorsConfiguration();
-        widgetCors.setAllowedOriginPatterns(List.of("*"));
-        widgetCors.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
-        widgetCors.setAllowedHeaders(List.of("*"));
-        widgetCors.setAllowCredentials(false);
-        widgetCors.setMaxAge(3600L);
-
-        source.registerCorsConfiguration("/api/widget/**", widgetCors);
-        // Widget chat dziala cross-origin (widget na cudzej domenie wola nasz chat).
-        source.registerCorsConfiguration("/api/chat/sessions", widgetCors);
-        source.registerCorsConfiguration("/api/chat/sessions/**", widgetCors);
-
+        source.registerCorsConfiguration("/api/**", cors);
         return source;
     }
 
