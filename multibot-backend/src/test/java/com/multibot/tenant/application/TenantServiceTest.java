@@ -78,6 +78,8 @@ class TenantServiceTest {
                 TenantSlug.of("acme-corp"),
                 TenantPlan.FREE,
                 TenantStatus.ACTIVE,
+                null,
+                null,
                 now,
                 now);
     }
