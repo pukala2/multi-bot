@@ -1,5 +1,6 @@
 package com.multibot.auth.infrastructure.security;
 
+import com.multibot.security.infrastructure.WidgetGuardFilter;
 import com.multibot.tenancy.filter.TenantContextFilter;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
@@ -66,19 +67,26 @@ class SecurityConfig {
     CorsConfigurationSource corsConfigurationSource() {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
 
+        // Widget odpowiada na kazde Origin (per-key whitelist egzekwuje WidgetGuardFilter / controller).
         CorsConfiguration widgetCors = new CorsConfiguration();
         widgetCors.setAllowedOriginPatterns(List.of("*"));
         widgetCors.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
         widgetCors.setAllowedHeaders(List.of("*"));
         widgetCors.setAllowCredentials(false);
         widgetCors.setMaxAge(3600L);
+
         source.registerCorsConfiguration("/api/widget/**", widgetCors);
+        // Widget chat dziala cross-origin (widget na cudzej domenie wola nasz chat).
+        source.registerCorsConfiguration("/api/chat/sessions", widgetCors);
+        source.registerCorsConfiguration("/api/chat/sessions/**", widgetCors);
 
         return source;
     }
 
     @Bean
-    SecurityFilterChain securityFilterChain(HttpSecurity http, TenantContextFilter tenantContextFilter) throws Exception {
+    SecurityFilterChain securityFilterChain(HttpSecurity http,
+                                            TenantContextFilter tenantContextFilter,
+                                            WidgetGuardFilter widgetGuardFilter) throws Exception {
         CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfRepo.setCookieName("XSRF-TOKEN");
         CsrfTokenRequestAttributeHandler csrfHandler = new CsrfTokenRequestAttributeHandler();
@@ -89,8 +97,9 @@ class SecurityConfig {
                 .csrf(csrf -> csrf
                         .csrfTokenRepository(csrfRepo)
                         .csrfTokenRequestHandler(csrfHandler)
-                        // widget i actuator nie wymagaja CSRF (anonimowe / read-only)
-                        .ignoringRequestMatchers("/api/widget/**", "/actuator/**"))
+                        // widget + chat (anonimowy widget, key-based) + actuator nie wymagaja CSRF.
+                        // Admin test chat jest same-origin + SameSite cookie -> CSRF redundantny.
+                        .ignoringRequestMatchers("/api/widget/**", "/api/chat/**", "/actuator/**"))
                 .sessionManagement(s -> s
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(a -> a
@@ -100,14 +109,21 @@ class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
                         .requestMatchers("/api/widget/**").permitAll()
-                        // Reszta tylko zalogowani
+                        // Widget chat (anonimowy) — authz przepuszcza, WidgetGuardFilter egzekwuje key+origin+limit.
+                        // Admin test chat trafia tu tez ale jest authenticated -> guard go przepuszcza.
+                        .requestMatchers(HttpMethod.POST, "/api/chat/sessions").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/api/chat/sessions/*/messages").permitAll()
+                        // Reszta tylko zalogowani (lista sesji, historia, dokumenty, billing, ...)
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e.authenticationEntryPoint(jsonAuthEntryPoint))
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)        // wlasny /api/auth/logout w controllerze
                 .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)
-                .addFilterAfter(tenantContextFilter, AuthorizationFilter.class)
+                // Guard PO autoryzacji (SecurityContext gotowy), PRZED TenantContextFilter
+                // (guard wrzuca tenant w request attribute ktory czyta resolver).
+                .addFilterAfter(widgetGuardFilter, AuthorizationFilter.class)
+                .addFilterAfter(tenantContextFilter, WidgetGuardFilter.class)
                 .build();
     }
 }

@@ -1,6 +1,6 @@
 @ApplicationModule(
         type = ApplicationModule.Type.OPEN,
-        allowedDependencies = {"shared", "tenancy", "tenant"}
+        allowedDependencies = {"shared", "tenancy", "tenant", "security"}
 )
 package com.multibot.auth;
 

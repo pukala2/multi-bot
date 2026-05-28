@@ -8,10 +8,22 @@ export interface SseHandlers {
   onError: (msg: string) => void;
 }
 
-export async function startSession(apiUrl: string): Promise<ChatSession> {
+function widgetHeaders(publicKey: string | null, extra?: Record<string, string>): Record<string, string> {
+  const headers: Record<string, string> = { 'Content-Type': 'application/json', ...extra };
+  if (publicKey) headers['X-Multibot-Widget-Key'] = publicKey;
+  return headers;
+}
+
+export async function startSession(
+  apiUrl: string,
+  publicKey: string | null,
+  turnstileToken?: string
+): Promise<ChatSession> {
+  const headers = widgetHeaders(publicKey);
+  if (turnstileToken) headers['X-Turnstile-Token'] = turnstileToken;
   const response = await fetch(`${apiUrl}/api/chat/sessions`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers,
     body: '{}',
   });
   if (!response.ok) throw new Error(`HTTP ${response.status}`);
@@ -20,6 +32,7 @@ export async function startSession(apiUrl: string): Promise<ChatSession> {
 
 export async function streamMessage(
   apiUrl: string,
+  publicKey: string | null,
   sessionId: string,
   content: string,
   handlers: SseHandlers,
@@ -27,10 +40,7 @@ export async function streamMessage(
 ): Promise<void> {
   const response = await fetch(`${apiUrl}/api/chat/sessions/${sessionId}/messages`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Accept: 'text/event-stream',
-    },
+    headers: widgetHeaders(publicKey, { Accept: 'text/event-stream' }),
     body: JSON.stringify({ content }),
     signal,
   });

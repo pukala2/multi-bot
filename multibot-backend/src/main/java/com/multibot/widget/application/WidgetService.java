@@ -1,6 +1,7 @@
 package com.multibot.widget.application;
 
 import com.multibot.shared.exception.ValidationException;
+import com.multibot.shared.tenant.TenantId;
 import com.multibot.tenancy.TenantContext;
 import com.multibot.widget.domain.model.WidgetConfig;
 import com.multibot.widget.domain.model.WidgetSettings;
@@ -61,6 +62,16 @@ class WidgetService implements GetWidgetConfigUseCase, UpdateWidgetSettingsUseCa
     @Transactional(readOnly = true)
     public List<String> getAllowedOrigins(String key) {
         return repository.findAllowedOrigins(key);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<TenantId> validateAndResolveTenant(String key, String origin) {
+        if (key == null || key.isBlank()) return Optional.empty();
+        Optional<UUID> tenantId = repository.findTenantIdByActiveKey(key);
+        if (tenantId.isEmpty()) return Optional.empty();
+        if (!isOriginAllowed(key, origin)) return Optional.empty();
+        return tenantId.map(TenantId::of);
     }
 
     @Override

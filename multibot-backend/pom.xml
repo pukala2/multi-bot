@@ -90,6 +90,13 @@
             <artifactId>spring-session-jdbc</artifactId>
         </dependency>
 
+        <!-- Rate limiting - Bucket4j (in-memory token bucket) -->
+        <dependency>
+            <groupId>com.bucket4j</groupId>
+            <artifactId>bucket4j_jdk17-core</artifactId>
+            <version>8.14.0</version>
+        </dependency>
+
         <!-- ============================================================ -->
         <!-- Database - PostgreSQL + pgvector + Flyway                     -->
         <!-- ============================================================ -->

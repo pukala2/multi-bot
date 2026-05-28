@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'preact/hooks';
 import type { WidgetConfig } from './config';
 import { startSession, streamMessage } from './api';
+import { getTurnstileToken } from './turnstile';
 
 interface Turn {
   role: 'user' | 'bot';
@@ -24,13 +25,14 @@ export function ChatWidget({ config }: Props) {
 
   useEffect(() => {
     if (open && !sessionId) {
-      startSession(config.apiUrl)
+      getTurnstileToken(config.apiUrl)
+        .then((token) => startSession(config.apiUrl, config.publicKey, token))
         .then((s) => setSessionId(s.id))
         .catch(() =>
           setTurns((t) => [...t, { role: 'bot', content: 'Nie udało się połączyć z botem. Spróbuj odświeżyć stronę.' }])
         );
     }
-  }, [open, sessionId, config.apiUrl]);
+  }, [open, sessionId, config.apiUrl, config.publicKey]);
 
   useEffect(() => {
     messagesRef.current?.scrollTo({ top: messagesRef.current.scrollHeight, behavior: 'smooth' });
@@ -55,6 +57,7 @@ export function ChatWidget({ config }: Props) {
 
     void streamMessage(
       config.apiUrl,
+      config.publicKey,
       sessionId,
       text,
       {

@@ -1,5 +1,6 @@
 package com.multibot.widget.domain.port.in;
 
+import com.multibot.shared.tenant.TenantId;
 import com.multibot.widget.domain.model.WidgetConfig;
 import com.multibot.widget.domain.model.WidgetSettings;
 
@@ -21,4 +22,11 @@ public interface GetWidgetConfigUseCase {
 
     /** Lista dozwolonych originów dla danego klucza (do zarzadzania w panelu). */
     List<String> getAllowedOrigins(String key);
+
+    /**
+     * Walidacja klucza widgeta dla zadania anonimowego (chat).
+     * Zwraca tenant jezeli: klucz aktywny ORAZ origin dozwolony.
+     * Inaczej empty (= 403 po stronie filtra).
+     */
+    Optional<TenantId> validateAndResolveTenant(String key, String origin);
 }

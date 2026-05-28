@@ -1,5 +1,6 @@
 export interface WidgetConfig {
   apiUrl: string;
+  publicKey: string | null;
   accentColor: string;
   position: 'bottom-right' | 'bottom-left';
   greeting: string;
@@ -15,6 +16,7 @@ export interface BootConfig {
 
 const DEFAULTS: WidgetConfig = {
   apiUrl: 'http://localhost:8080',
+  publicKey: null,
   accentColor: '#7B5BFF',
   position: 'bottom-right',
   greeting: 'Cześć! Jak mogę pomóc?',
@@ -70,6 +72,7 @@ export async function resolveConfig(boot: BootConfig): Promise<WidgetConfig> {
 
   return {
     apiUrl: boot.apiUrl,
+    publicKey: boot.publicKey,
     accentColor: boot.overrides.accentColor ?? serverConfig.accentColor ?? DEFAULTS.accentColor,
     position: boot.overrides.position ?? serverConfig.position ?? DEFAULTS.position,
     greeting: boot.overrides.greeting ?? serverConfig.greeting ?? DEFAULTS.greeting,

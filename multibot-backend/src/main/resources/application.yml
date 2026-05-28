@@ -113,6 +113,15 @@ multibot:
       owner-email:    ${MULTIBOT_DEMO_OWNER_EMAIL:owner@demo.local}
       owner-password: ${MULTIBOT_DEMO_OWNER_PASSWORD:Demo!Owner2026}
 
+  security:
+    rate-limit:
+      per-ip-per-day:        ${MULTIBOT_RATE_LIMIT_IP:80}
+      per-session-per-day:   ${MULTIBOT_RATE_LIMIT_SESSION:60}
+    turnstile:
+      enabled:    ${MULTIBOT_TURNSTILE_ENABLED:false}
+      site-key:   ${MULTIBOT_TURNSTILE_SITE_KEY:}
+      secret-key: ${MULTIBOT_TURNSTILE_SECRET_KEY:}
+
   file:
     storage:
       mode: local                  # local | s3
