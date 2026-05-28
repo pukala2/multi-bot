@@ -115,6 +115,8 @@ class SecurityConfig {
                         // Admin test chat trafia tu tez ale jest authenticated -> guard go przepuszcza.
                         .requestMatchers(HttpMethod.POST, "/api/chat/sessions").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/chat/sessions/*/messages").permitAll()
+                        // Super admin — tylko rola SUPER_ADMIN
+                        .requestMatchers("/api/super-admin/**").hasRole("SUPER_ADMIN")
                         // Reszta tylko zalogowani (lista sesji, historia, dokumenty, billing, ...)
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e.authenticationEntryPoint(jsonAuthEntryPoint))

@@ -54,13 +54,19 @@ class TenantJpaEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "company_name")
+    private String companyName;
+
+    @Column(name = "nip")
+    private String nip;
+
     @Column(name = "created_by")
     private UUID createdBy;
 
     @Column(name = "updated_by")
     private UUID updatedBy;
 
-    enum TenantPlanValue {FREE, BASIC, PRO}
+    enum TenantPlanValue {FREE, BASIC, PRO, ENTERPRISE}
 
     enum TenantStatusValue {ACTIVE, SUSPENDED}
 }

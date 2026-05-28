@@ -12,6 +12,8 @@ public record Tenant(
         TenantSlug slug,
         TenantPlan plan,
         TenantStatus status,
+        String companyName,   // nullable — formalna nazwa firmy (do faktur)
+        String nip,           // nullable — NIP
         Instant createdAt,
         Instant updatedAt
 ) implements TenantOwned {

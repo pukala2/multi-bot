@@ -18,6 +18,8 @@ final class TenantEntityMapper {
                 TenantSlug.of(entity.getSlug()),
                 TenantPlan.valueOf(entity.getPlan().name()),
                 TenantStatus.valueOf(entity.getStatus().name()),
+                entity.getCompanyName(),
+                entity.getNip(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt());
     }
@@ -29,6 +31,8 @@ final class TenantEntityMapper {
                 .slug(tenant.slug().value())
                 .plan(TenantJpaEntity.TenantPlanValue.valueOf(tenant.plan().name()))
                 .status(TenantJpaEntity.TenantStatusValue.valueOf(tenant.status().name()))
+                .companyName(tenant.companyName())
+                .nip(tenant.nip())
                 .createdAt(tenant.createdAt())
                 .updatedAt(tenant.updatedAt())
                 .build();
