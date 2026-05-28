@@ -13,6 +13,7 @@ import { WidgetPage } from '@/pages/WidgetPage';
 import { SettingsPage } from '@/pages/SettingsPage';
 import { AnalyticsPage } from '@/pages/AnalyticsPage';
 import { BillingPage } from '@/pages/BillingPage';
+import { SuperAdminPage } from '@/pages/SuperAdminPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
 
@@ -44,6 +45,7 @@ export default function App() {
               <Route path="/settings" element={<SettingsPage />} />
               <Route path="/billing" element={<BillingPage />} />
               <Route path="/analytics" element={<AnalyticsPage />} />
+              <Route path="/super-admin" element={<SuperAdminPage />} />
               <Route
                 path="*"
                 element={

@@ -1,6 +1,6 @@
 import { NavLink } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Bot, MessageSquare, Inbox, Settings, BarChart3, Code, LogOut, CreditCard } from 'lucide-react';
+import { LayoutDashboard, Bot, MessageSquare, Inbox, Settings, BarChart3, Code, LogOut, CreditCard, Building2 } from 'lucide-react';
 import { cn } from '@/lib/cn';
 import { useAuth, useLogout, type UserRole } from '@/hooks/useAuth';
 
@@ -9,6 +9,7 @@ interface NavItem {
   icon: LucideIcon;
   label: string;
   hiddenFor?: UserRole[];
+  onlyFor?: UserRole[];
 }
 
 interface NavGroup {
@@ -32,9 +33,14 @@ const NAV_GROUPS: NavGroup[] = [
     items: [
       { to: '/settings', icon: Settings, label: 'Ustawienia' },
       // Plan i limity to feature per-tenant — super admin (bez tenanta) tego nie ma.
-      // Cross-tenant overview pojawi się w Fazie D.
       { to: '/billing', icon: CreditCard, label: 'Plan i limity', hiddenFor: ['SUPER_ADMIN'] },
       { to: '/analytics', icon: BarChart3, label: 'Analityka' },
+    ],
+  },
+  {
+    label: 'Platforma',
+    items: [
+      { to: '/super-admin', icon: Building2, label: 'Klienci', onlyFor: ['SUPER_ADMIN'] },
     ],
   },
 ];
@@ -59,9 +65,11 @@ export function Sidebar() {
       </div>
 
       {NAV_GROUPS.map((group) => {
-        const visibleItems = group.items.filter(
-          (item) => !item.hiddenFor || !user || !item.hiddenFor.includes(user.role)
-        );
+        const visibleItems = group.items.filter((item) => {
+          if (item.hiddenFor && user && item.hiddenFor.includes(user.role)) return false;
+          if (item.onlyFor && (!user || !item.onlyFor.includes(user.role))) return false;
+          return true;
+        });
         if (visibleItems.length === 0) return null;
         return (
         <div key={group.label}>
