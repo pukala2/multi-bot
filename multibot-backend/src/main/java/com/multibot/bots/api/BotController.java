@@ -1,30 +1,26 @@
 package com.multibot.bots.api;
 
+import com.multibot.api.generated.api.BotsApi;
+import com.multibot.api.generated.model.AddBotRequest;
+import com.multibot.api.generated.model.AddBotResponse;
+import com.multibot.api.generated.model.BotLimitResponse;
 import com.multibot.auth.infrastructure.security.MultibotUserDetails;
 import com.multibot.billing.domain.model.BotLimitDecision;
 import com.multibot.bots.domain.port.in.AddBotUseCase.AddBotResult;
 import com.multibot.bots.domain.port.in.ManageOwnerBotsUseCase;
 import com.multibot.shared.exception.ForbiddenException;
 import com.multibot.shared.organization.OrganizationId;
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.LinkedHashMap;
-import java.util.Map;
-
 /**
- * Self-serve zarzadzanie botami przez ownera. Limit liczby botow per plan egzekwowany w serwisie.
+ * Self-serve zarzadzanie botami przez ownera (contract-first, implementuje {@link BotsApi}).
+ * Limit liczby botow per plan egzekwowany w serwisie (ConflictException -> 409).
  */
 @RestController
-@RequestMapping("/api/bots")
-class BotController {
+class BotController implements BotsApi {
 
     private final ManageOwnerBotsUseCase ownerBots;
 
@@ -32,43 +28,26 @@ class BotController {
         this.ownerBots = ownerBots;
     }
 
-    @GetMapping("/limit")
-    ResponseEntity<Map<String, Object>> limit(@AuthenticationPrincipal MultibotUserDetails me) {
-        OrganizationId org = requireOrg(me);
-        BotLimitDecision d = ownerBots.currentLimit(org);
-
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("allowed", d.allowed());
-        body.put("currentBots", d.currentBots());
-        body.put("maxBots", d.maxBots());      // -1 = bez limitu
-        body.put("unlimited", d.unlimited());
-        return ResponseEntity.ok(body);
+    @Override
+    public ResponseEntity<BotLimitResponse> getBotLimit() {
+        BotLimitDecision d = ownerBots.currentLimit(requireOrg());
+        return ResponseEntity.ok(new BotLimitResponse(
+                d.allowed(), d.currentBots(), d.maxBots(), d.unlimited()));
     }
 
-    @PostMapping
-    ResponseEntity<Map<String, Object>> addBot(@AuthenticationPrincipal MultibotUserDetails me,
-                                               @Valid @RequestBody AddBotRequest req) {
-        OrganizationId org = requireOrg(me);
-        AddBotResult r = ownerBots.addBot(org, req.name(), req.url());
-
-        Map<String, Object> body = new LinkedHashMap<>();
-        body.put("botId", r.botId().value().toString());
-        body.put("botName", r.botName());
-        body.put("widgetKey", r.widgetKey());
-        return ResponseEntity.status(201).body(body);
+    @Override
+    public ResponseEntity<AddBotResponse> addOwnerBot(AddBotRequest addBotRequest) {
+        AddBotResult r = ownerBots.addBot(requireOrg(), addBotRequest.getName(), addBotRequest.getUrl());
+        return ResponseEntity.status(201).body(new AddBotResponse(
+                r.botId().value(), r.botName(), r.widgetKey()));
     }
 
-    private static OrganizationId requireOrg(MultibotUserDetails me) {
-        if (me == null) {
+    private static OrganizationId requireOrg() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !(auth.getPrincipal() instanceof MultibotUserDetails me)) {
             throw new ForbiddenException("Brak uwierzytelnienia");
         }
         return me.organizationIdAsOptional()
                 .orElseThrow(() -> new ForbiddenException("Konto nie należy do żadnej organizacji"));
-    }
-
-    record AddBotRequest(
-            @NotBlank String name,
-            String url
-    ) {
     }
 }

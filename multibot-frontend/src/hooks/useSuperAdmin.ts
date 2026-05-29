@@ -1,52 +1,13 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { readCookie } from '@/api/client';
+import type { components } from '@/api/schema';
 
-export interface BotRow {
-  id: string;
-  name: string;
-  slug: string;
-  userMessages: number;
-}
-
-export interface OrganizationRow {
-  id: string;
-  name: string;
-  slug: string;
-  plan: string;
-  status: string;
-  companyName: string | null;
-  nip: string | null;
-  userMessages: number;     // pooled — suma wszystkich botow org
-  effectiveLimit: number;   // -1 = unlimited
-  bots: BotRow[];
-  createdAt: string;
-}
-
-export interface CreateOrganizationInput {
-  name: string;
-  ownerEmail: string;
-  plan: string;
-  companyName?: string;
-  nip?: string;
-  firstBotName?: string;
-  firstBotUrl?: string;
-}
-
-export interface ProvisionResult {
-  organizationId: string;
-  organizationName: string;
-  ownerEmail: string;
-  generatedPassword: string;
-  firstBotId: string;
-  firstBotName: string;
-  widgetKey: string;
-}
-
-export interface AddBotResult {
-  botId: string;
-  botName: string;
-  widgetKey: string;
-}
+// Typy z kontraktu (openapi.yaml → schema.ts).
+export type BotRow = components['schemas']['OrganizationBotRow'];
+export type OrganizationRow = components['schemas']['OrganizationRow'];      // userMessages pooled; effectiveLimit -1 = unlimited
+export type CreateOrganizationInput = components['schemas']['CreateOrganizationRequest'];
+export type ProvisionResult = components['schemas']['ProvisionResponse'];
+export type AddBotResult = components['schemas']['AddBotResponse'];
 
 const ORGS_KEY = ['superadmin', 'organizations'] as const;
 

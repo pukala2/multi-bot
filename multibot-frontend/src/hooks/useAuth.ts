@@ -1,25 +1,12 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { readCookie } from '@/api/client';
+import type { components } from '@/api/schema';
 
-export type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN';
-export type UserStatus = 'ACTIVE' | 'DISABLED' | 'MUST_CHANGE_PASSWORD';
-
-export interface BotSummary {
-  id: string;
-  name: string;
-  slug: string;
-}
-
-export interface CurrentUser {
-  id: string;
-  email: string;
-  role: UserRole;
-  status: UserStatus;
-  organizationId: string | null;
-  lastLoginAt: string | null;
-  activeBot: BotSummary | null;
-  bots: BotSummary[];
-}
+// Typy wyprowadzone z kontraktu (openapi.yaml → schema.ts). Single source of truth.
+export type BotSummary = components['schemas']['BotSummary'];
+export type CurrentUser = components['schemas']['MeResponse'];
+export type UserRole = CurrentUser['role'];
+export type UserStatus = CurrentUser['status'];
 
 const ME_KEY = ['auth', 'me'] as const;
 

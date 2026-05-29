@@ -1,24 +1,21 @@
 package com.multibot.widget.api;
 
+import com.multibot.api.generated.api.WidgetOriginsApi;
+import com.multibot.api.generated.model.WidgetOriginsRequest;
+import com.multibot.api.generated.model.WidgetOriginsResponse;
 import com.multibot.widget.domain.port.in.GetWidgetConfigUseCase;
 import com.multibot.widget.domain.port.in.UpdateWidgetSettingsUseCase;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.PutMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
-import java.util.Map;
 
 /**
  * Zarzadzanie dozwolonymi domenami widgetu aktywnego bota (allowed_origins).
- * Ręczny kontroler (poza openapi.yaml). Tenant = aktywny bot (z sesji).
+ * Contract-first (implementuje {@link WidgetOriginsApi}). Tenant = aktywny bot (z sesji).
  */
 @RestController
-@RequestMapping("/api/admin/widget/origins")
-class WidgetOriginsController {
+class WidgetOriginsController implements WidgetOriginsApi {
 
     private final GetWidgetConfigUseCase getConfig;
     private final UpdateWidgetSettingsUseCase updateSettings;
@@ -28,18 +25,15 @@ class WidgetOriginsController {
         this.updateSettings = updateSettings;
     }
 
-    @GetMapping
-    ResponseEntity<Map<String, Object>> get() {
-        return ResponseEntity.ok(Map.of("origins", getConfig.getAllowedOriginsForCurrentTenant()));
+    @Override
+    public ResponseEntity<WidgetOriginsResponse> getWidgetOrigins() {
+        return ResponseEntity.ok(new WidgetOriginsResponse(getConfig.getAllowedOriginsForCurrentTenant()));
     }
 
-    @PutMapping
-    ResponseEntity<Map<String, Object>> update(@RequestBody OriginsRequest req) {
+    @Override
+    public ResponseEntity<WidgetOriginsResponse> updateWidgetOrigins(WidgetOriginsRequest widgetOriginsRequest) {
         List<String> saved = updateSettings.updateAllowedOriginsForCurrentTenant(
-                req.origins() == null ? List.of() : req.origins());
-        return ResponseEntity.ok(Map.of("origins", saved));
-    }
-
-    record OriginsRequest(List<String> origins) {
+                widgetOriginsRequest.getOrigins() == null ? List.of() : widgetOriginsRequest.getOrigins());
+        return ResponseEntity.ok(new WidgetOriginsResponse(saved));
     }
 }

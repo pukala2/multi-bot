@@ -21,6 +21,18 @@ tags:
     description: Upload, listowanie, usuwanie dokumentów + monitorowanie statusu indeksacji.
   - name: Chat
     description: Sesje chatu, historia wiadomości, wysyłanie wiadomości z SSE streamingiem.
+  - name: Auth
+    description: Logowanie/wylogowanie (sesje cookie), bieżący użytkownik, przełączanie aktywnego bota.
+  - name: Bots
+    description: Self-serve zarządzanie botami przez OWNERa (limit per plan egzekwowany serwerowo).
+  - name: SuperAdmin
+    description: Provisioning organizacji i botów przez SUPER_ADMINa (omija limit botów).
+  - name: Billing
+    description: Plan i zużycie wiadomości aktualnego bota (liczby user-friendly, bez tokenów/kosztów).
+  - name: WidgetOrigins
+    description: Dozwolone domeny widgetu aktywnego bota (allowed_origins).
+  - name: Turnstile
+    description: Publiczna konfiguracja anty-bota (Cloudflare Turnstile) dla widgetu.
 
 # ============================================================
 # PATHS
@@ -601,6 +613,274 @@ paths:
         '500':
           $ref: '#/components/responses/InternalServerError'
 
+  # ----- Auth (ręczne kontrolery, sesje cookie) -----
+
+  /api/auth/login:
+    post:
+      tags:
+        - Auth
+      summary: Logowanie (ustawia sesję cookie + XSRF-TOKEN)
+      operationId: login
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Zalogowano — zwraca bieżącego użytkownika
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/auth/logout:
+    post:
+      tags:
+        - Auth
+      summary: Wylogowanie (czyści sesję)
+      operationId: logout
+      responses:
+        '204':
+          description: Wylogowano
+
+  /api/auth/me:
+    get:
+      tags:
+        - Auth
+      summary: Bieżący użytkownik + organizacja + aktywny bot + lista botów
+      operationId: getCurrentUser
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MeResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /api/auth/active-bot:
+    post:
+      tags:
+        - Auth
+      summary: Przełącz aktywnego bota (waliduje że bot należy do organizacji usera)
+      operationId: switchActiveBot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ActiveBotRequest'
+      responses:
+        '200':
+          description: Przełączono — zwraca aktywnego bota
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BotSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ----- Bots (self-serve OWNER) -----
+
+  /api/bots/limit:
+    get:
+      tags:
+        - Bots
+      summary: Bieżący limit botów organizacji
+      operationId: getBotLimit
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BotLimitResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+
+  /api/bots:
+    post:
+      tags:
+        - Bots
+      summary: Dodaj bota (egzekwuje max_bots planu → 409)
+      operationId: addOwnerBot
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddBotRequest'
+      responses:
+        '201':
+          description: Utworzono bota
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddBotResponse'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  # ----- Super Admin (provisioning) -----
+
+  /api/super-admin/organizations:
+    get:
+      tags:
+        - SuperAdmin
+      summary: Lista wszystkich organizacji (z botami i zużyciem)
+      operationId: listOrganizations
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/OrganizationRow'
+    post:
+      tags:
+        - SuperAdmin
+      summary: Utwórz organizację + ownera + pierwszego bota
+      description: Zwraca RAZ hasło ownera i klucz widgetu — nie da się ich odzyskać później.
+      operationId: createOrganization
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateOrganizationRequest'
+      responses:
+        '201':
+          description: Utworzono organizację
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProvisionResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+
+  /api/super-admin/organizations/{orgId}/bots:
+    post:
+      tags:
+        - SuperAdmin
+      summary: Dodaj bota do organizacji (omija limit planu)
+      operationId: addBotToOrganization
+      parameters:
+        - name: orgId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AddBotRequest'
+      responses:
+        '201':
+          description: Utworzono bota
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AddBotResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ----- Billing (admin klienta) -----
+
+  /api/admin/billing/usage:
+    get:
+      tags:
+        - Billing
+      summary: Zużycie wiadomości aktualnego bota (pooled per organizacja)
+      operationId: getBillingUsage
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingUsageResponse'
+
+  /api/admin/billing/plan:
+    get:
+      tags:
+        - Billing
+      summary: Plan aktualnego bota
+      operationId: getBillingPlan
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BillingPlanResponse'
+
+  # ----- Widget origins (dozwolone domeny aktywnego bota) -----
+
+  /api/admin/widget/origins:
+    get:
+      tags:
+        - WidgetOrigins
+      summary: Pobierz dozwolone domeny widgetu
+      operationId: getWidgetOrigins
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WidgetOriginsResponse'
+    put:
+      tags:
+        - WidgetOrigins
+      summary: Zapisz dozwolone domeny widgetu (URL → origin normalizacja serwerowa)
+      operationId: updateWidgetOrigins
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WidgetOriginsRequest'
+      responses:
+        '200':
+          description: Zapisane (znormalizowane)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WidgetOriginsResponse'
+
+  # ----- Turnstile (publiczna konfiguracja anty-bota) -----
+
+  /api/widget/turnstile:
+    get:
+      tags:
+        - Turnstile
+      summary: Czy Turnstile jest włączony i jaki sitekey załadować
+      operationId: getTurnstileConfig
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TurnstileConfigResponse'
+
 # ============================================================
 # COMPONENTS
 # ============================================================
@@ -686,6 +966,379 @@ components:
                 $ref: '#/components/schemas/ValidationErrorDetail'
           required:
             - errors
+
+    # === Auth ===
+
+    LoginRequest:
+      type: object
+      properties:
+        email:
+          type: string
+          example: owner@demo.local
+        password:
+          type: string
+          example: "Demo!Owner2026"
+      required:
+        - email
+        - password
+
+    BotSummary:
+      type: object
+      description: Skrócona reprezentacja bota (przełącznik, listy).
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+      required:
+        - id
+        - name
+        - slug
+
+    MeResponse:
+      type: object
+      description: Bieżący użytkownik z kontekstem organizacji i aktywnego bota.
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        role:
+          type: string
+          enum: [SUPER_ADMIN, OWNER, ADMIN]
+        status:
+          type: string
+          enum: [ACTIVE, DISABLED, MUST_CHANGE_PASSWORD]
+        organizationId:
+          type: string
+          format: uuid
+          nullable: true
+          description: NULL dla SUPER_ADMINa.
+        lastLoginAt:
+          type: string
+          nullable: true
+          description: ISO 8601 (instant). NULL gdy nigdy nie logowano.
+        activeBot:
+          allOf:
+            - $ref: '#/components/schemas/BotSummary'
+          nullable: true
+        bots:
+          type: array
+          items:
+            $ref: '#/components/schemas/BotSummary'
+      required:
+        - id
+        - email
+        - role
+        - status
+        - bots
+
+    ActiveBotRequest:
+      type: object
+      properties:
+        tenantId:
+          type: string
+          format: uuid
+      required:
+        - tenantId
+
+    # === Bots (self-serve) ===
+
+    BotLimitResponse:
+      type: object
+      properties:
+        allowed:
+          type: boolean
+          description: Czy można dodać kolejnego bota.
+        currentBots:
+          type: integer
+          format: int32
+        maxBots:
+          type: integer
+          format: int32
+          description: -1 = bez limitu.
+        unlimited:
+          type: boolean
+      required:
+        - allowed
+        - currentBots
+        - maxBots
+        - unlimited
+
+    AddBotRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        url:
+          type: string
+          nullable: true
+          description: Adres strony (→ origin) dozwolonej domeny widgetu.
+      required:
+        - name
+
+    AddBotResponse:
+      type: object
+      description: Zawiera klucz widgetu pokazywany RAZ.
+      properties:
+        botId:
+          type: string
+          format: uuid
+        botName:
+          type: string
+        widgetKey:
+          type: string
+      required:
+        - botId
+        - botName
+        - widgetKey
+
+    # === Super Admin ===
+
+    OrganizationBotRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        userMessages:
+          type: integer
+          format: int64
+      required:
+        - id
+        - name
+        - slug
+        - userMessages
+
+    OrganizationRow:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        plan:
+          type: string
+        status:
+          type: string
+        companyName:
+          type: string
+          nullable: true
+        nip:
+          type: string
+          nullable: true
+        userMessages:
+          type: integer
+          format: int64
+          description: Pooled — suma wiadomości wszystkich botów organizacji.
+        effectiveLimit:
+          type: integer
+          format: int32
+          description: -1 = bez limitu.
+        bots:
+          type: array
+          items:
+            $ref: '#/components/schemas/OrganizationBotRow'
+        createdAt:
+          type: string
+          description: ISO 8601 (instant).
+      required:
+        - id
+        - name
+        - slug
+        - plan
+        - status
+        - userMessages
+        - effectiveLimit
+        - bots
+        - createdAt
+
+    CreateOrganizationRequest:
+      type: object
+      properties:
+        name:
+          type: string
+        ownerEmail:
+          type: string
+          format: email
+        plan:
+          type: string
+          example: FREE
+        companyName:
+          type: string
+          nullable: true
+        nip:
+          type: string
+          nullable: true
+        firstBotName:
+          type: string
+          nullable: true
+        firstBotUrl:
+          type: string
+          nullable: true
+      required:
+        - name
+        - ownerEmail
+        - plan
+
+    ProvisionResponse:
+      type: object
+      description: Dane provisioningu — hasło i klucz widgetu pokazywane RAZ.
+      properties:
+        organizationId:
+          type: string
+          format: uuid
+        organizationName:
+          type: string
+        ownerEmail:
+          type: string
+        generatedPassword:
+          type: string
+        firstBotId:
+          type: string
+          format: uuid
+        firstBotName:
+          type: string
+        widgetKey:
+          type: string
+      required:
+        - organizationId
+        - organizationName
+        - ownerEmail
+        - generatedPassword
+        - firstBotId
+        - firstBotName
+        - widgetKey
+
+    # === Billing ===
+
+    BillingUsageResponse:
+      type: object
+      properties:
+        plan:
+          type: string
+        planName:
+          type: string
+        monthlyMessagesLimit:
+          type: integer
+          format: int32
+        effectiveLimit:
+          type: integer
+          format: int32
+        userMessages:
+          type: integer
+          format: int64
+        aiMessages:
+          type: integer
+          format: int64
+        periodMonth:
+          type: string
+          description: Data początku okresu rozliczeniowego (ISO YYYY-MM-DD, pierwszy dzień miesiąca).
+        resetsAt:
+          type: string
+          description: ISO 8601 — początek następnego miesiąca.
+        remainingDays:
+          type: integer
+          format: int64
+        percentUsed:
+          type: number
+          format: double
+        unlimited:
+          type: boolean
+      required:
+        - plan
+        - planName
+        - monthlyMessagesLimit
+        - effectiveLimit
+        - userMessages
+        - aiMessages
+        - periodMonth
+        - resetsAt
+        - remainingDays
+        - percentUsed
+        - unlimited
+
+    BillingPlanResponse:
+      type: object
+      properties:
+        code:
+          type: string
+        name:
+          type: string
+        monthlyMessagesLimit:
+          type: integer
+          format: int32
+        effectiveLimit:
+          type: integer
+          format: int32
+        maxBots:
+          type: integer
+          format: int32
+          nullable: true
+          description: NULL = bez limitu botów.
+        customDomainAllowed:
+          type: boolean
+        apiAccessAllowed:
+          type: boolean
+        pricePlnMonthly:
+          type: integer
+          format: int32
+          nullable: true
+          description: Cena miesięczna w PLN (całe złote). NULL = custom pricing.
+      required:
+        - code
+        - name
+        - monthlyMessagesLimit
+        - effectiveLimit
+        - customDomainAllowed
+        - apiAccessAllowed
+
+    # === Widget origins ===
+
+    WidgetOriginsRequest:
+      type: object
+      properties:
+        origins:
+          type: array
+          items:
+            type: string
+          description: Lista URLi/originów; serwer normalizuje do origin. Pusta = działa wszędzie.
+      required:
+        - origins
+
+    WidgetOriginsResponse:
+      type: object
+      properties:
+        origins:
+          type: array
+          items:
+            type: string
+      required:
+        - origins
+
+    # === Turnstile ===
+
+    TurnstileConfigResponse:
+      type: object
+      properties:
+        enabled:
+          type: boolean
+        siteKey:
+          type: string
+      required:
+        - enabled
+        - siteKey
 
     IdResponse:
       type: object

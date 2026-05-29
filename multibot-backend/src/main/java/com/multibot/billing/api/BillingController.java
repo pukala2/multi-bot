@@ -1,29 +1,26 @@
 package com.multibot.billing.api;
 
+import com.multibot.api.generated.api.BillingApi;
+import com.multibot.api.generated.model.BillingPlanResponse;
+import com.multibot.api.generated.model.BillingUsageResponse;
 import com.multibot.billing.domain.model.BillingPlan;
 import com.multibot.billing.domain.model.TenantUsage;
 import com.multibot.billing.domain.port.in.GetUsageUseCase;
 import com.multibot.shared.tenant.TenantId;
 import com.multibot.tenancy.TenantContext;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.time.LocalDate;
 import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
-import java.util.HashMap;
-import java.util.Map;
 
 /**
- * Endpointy dla zwykłego admina (klienta panelu).
- * Zwracaja TYLKO user-friendly liczby — bez tokenow i kosztow OpenAI.
- * Te ostatnie idą do super admin endpointow (planowane w innej fazie).
+ * Endpointy dla zwykłego admina (klienta panelu) — contract-first, implementuje {@link BillingApi}.
+ * Zwracaja TYLKO user-friendly liczby — bez tokenow i kosztow OpenAI (te idą do super admina).
  */
 @RestController
-@RequestMapping("/api/admin/billing")
-class BillingController {
+class BillingController implements BillingApi {
 
     private final GetUsageUseCase getUsageUseCase;
 
@@ -31,8 +28,8 @@ class BillingController {
         this.getUsageUseCase = getUsageUseCase;
     }
 
-    @GetMapping("/usage")
-    ResponseEntity<Map<String, Object>> getUsage() {
+    @Override
+    public ResponseEntity<BillingUsageResponse> getBillingUsage() {
         TenantId tenant = TenantContext.get();
         BillingPlan plan = getUsageUseCase.getPlan(tenant);
         TenantUsage usage = getUsageUseCase.getCurrentUsage(tenant);
@@ -47,36 +44,36 @@ class BillingController {
         double percent = effectiveLimit == -1 ? 0.0
                 : (effectiveLimit == 0 ? 0.0 : (usedMessages * 100.0) / effectiveLimit);
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("plan", plan.code());
-        body.put("planName", plan.name());
-        body.put("monthlyMessagesLimit", plan.monthlyMessagesLimit());
-        body.put("effectiveLimit", effectiveLimit);
-        body.put("userMessages", usedMessages);
-        body.put("aiMessages", usage.aiMessages());
-        body.put("periodMonth", usage.periodMonth().toString());
-        body.put("resetsAt", nextReset.atStartOfDay().toString() + "Z");
-        body.put("remainingDays", daysToReset);
-        body.put("percentUsed", Math.round(percent * 10) / 10.0);
-        body.put("unlimited", effectiveLimit == -1);
+        BillingUsageResponse body = new BillingUsageResponse(
+                plan.code(),
+                plan.name(),
+                plan.monthlyMessagesLimit(),
+                effectiveLimit,
+                usedMessages,
+                usage.aiMessages(),
+                usage.periodMonth().toString(),
+                nextReset.atStartOfDay().toString() + "Z",
+                daysToReset,
+                Math.round(percent * 10) / 10.0,
+                effectiveLimit == -1);
         return ResponseEntity.ok(body);
     }
 
-    @GetMapping("/plan")
-    ResponseEntity<Map<String, Object>> getPlan() {
+    @Override
+    public ResponseEntity<BillingPlanResponse> getBillingPlan() {
         TenantId tenant = TenantContext.get();
         BillingPlan plan = getUsageUseCase.getPlan(tenant);
         int effectiveLimit = getUsageUseCase.getEffectiveLimit(tenant);
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("code", plan.code());
-        body.put("name", plan.name());
-        body.put("monthlyMessagesLimit", plan.monthlyMessagesLimit());
-        body.put("effectiveLimit", effectiveLimit);
-        body.put("maxBots", plan.maxBots());   // null = bez limitu
-        body.put("customDomainAllowed", plan.customDomainAllowed());
-        body.put("apiAccessAllowed", plan.apiAccessAllowed());
-        body.put("pricePlnMonthly", plan.pricePlnMonthly());
+        BillingPlanResponse body = new BillingPlanResponse(
+                plan.code(),
+                plan.name(),
+                plan.monthlyMessagesLimit(),
+                effectiveLimit,
+                plan.customDomainAllowed(),
+                plan.apiAccessAllowed());
+        body.setMaxBots(plan.maxBots());                 // null = bez limitu
+        body.setPricePlnMonthly(plan.pricePlnMonthly()); // null = custom pricing
         return ResponseEntity.ok(body);
     }
 }

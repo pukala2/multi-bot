@@ -1,18 +1,10 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { readCookie } from '@/api/client';
+import type { components } from '@/api/schema';
 
-export interface BotLimit {
-  allowed: boolean;
-  currentBots: number;
-  maxBots: number;      // -1 = bez limitu
-  unlimited: boolean;
-}
-
-export interface AddedBot {
-  botId: string;
-  botName: string;
-  widgetKey: string;
-}
+// Typy z kontraktu (openapi.yaml → schema.ts).
+export type BotLimit = components['schemas']['BotLimitResponse'];   // maxBots -1 = bez limitu
+export type AddedBot = components['schemas']['AddBotResponse'];
 
 const LIMIT_KEY = ['bots', 'limit'] as const;
 const ME_KEY = ['auth', 'me'] as const;

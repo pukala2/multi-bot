@@ -327,6 +327,215 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Logowanie (ustawia sesję cookie + XSRF-TOKEN) */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Wylogowanie (czyści sesję) */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bieżący użytkownik + organizacja + aktywny bot + lista botów */
+        get: operations["getCurrentUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/auth/active-bot": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Przełącz aktywnego bota (waliduje że bot należy do organizacji usera) */
+        post: operations["switchActiveBot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bots/limit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Bieżący limit botów organizacji */
+        get: operations["getBotLimit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/bots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dodaj bota (egzekwuje max_bots planu → 409) */
+        post: operations["addOwnerBot"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/super-admin/organizations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Lista wszystkich organizacji (z botami i zużyciem) */
+        get: operations["listOrganizations"];
+        put?: never;
+        /**
+         * Utwórz organizację + ownera + pierwszego bota
+         * @description Zwraca RAZ hasło ownera i klucz widgetu — nie da się ich odzyskać później.
+         */
+        post: operations["createOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/super-admin/organizations/{orgId}/bots": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dodaj bota do organizacji (omija limit planu) */
+        post: operations["addBotToOrganization"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/billing/usage": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Zużycie wiadomości aktualnego bota (pooled per organizacja) */
+        get: operations["getBillingUsage"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/billing/plan": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Plan aktualnego bota */
+        get: operations["getBillingPlan"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/admin/widget/origins": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Pobierz dozwolone domeny widgetu */
+        get: operations["getWidgetOrigins"];
+        /** Zapisz dozwolone domeny widgetu (URL → origin normalizacja serwerowa) */
+        put: operations["updateWidgetOrigins"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/widget/turnstile": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Czy Turnstile jest włączony i jaki sitekey załadować */
+        get: operations["getTurnstileConfig"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -392,6 +601,172 @@ export interface components {
         /** @description ProblemDetail rozszerzony o listę błędów walidacji (response 400) */
         ValidationProblemDetail: components["schemas"]["ProblemDetail"] & {
             errors: components["schemas"]["ValidationErrorDetail"][];
+        };
+        LoginRequest: {
+            /** @example owner@demo.local */
+            email: string;
+            /** @example Demo!Owner2026 */
+            password: string;
+        };
+        /** @description Skrócona reprezentacja bota (przełącznik, listy). */
+        BotSummary: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            slug: string;
+        };
+        /** @description Bieżący użytkownik z kontekstem organizacji i aktywnego bota. */
+        MeResponse: {
+            /** Format: uuid */
+            id: string;
+            email: string;
+            /** @enum {string} */
+            role: "SUPER_ADMIN" | "OWNER" | "ADMIN";
+            /** @enum {string} */
+            status: "ACTIVE" | "DISABLED" | "MUST_CHANGE_PASSWORD";
+            /**
+             * Format: uuid
+             * @description NULL dla SUPER_ADMINa.
+             */
+            organizationId?: string | null;
+            /** @description ISO 8601 (instant). NULL gdy nigdy nie logowano. */
+            lastLoginAt?: string | null;
+            activeBot?: components["schemas"]["BotSummary"] | null;
+            bots: components["schemas"]["BotSummary"][];
+        };
+        ActiveBotRequest: {
+            /** Format: uuid */
+            tenantId: string;
+        };
+        BotLimitResponse: {
+            /** @description Czy można dodać kolejnego bota. */
+            allowed: boolean;
+            /** Format: int32 */
+            currentBots: number;
+            /**
+             * Format: int32
+             * @description -1 = bez limitu.
+             */
+            maxBots: number;
+            unlimited: boolean;
+        };
+        AddBotRequest: {
+            name: string;
+            /** @description Adres strony (→ origin) dozwolonej domeny widgetu. */
+            url?: string | null;
+        };
+        /** @description Zawiera klucz widgetu pokazywany RAZ. */
+        AddBotResponse: {
+            /** Format: uuid */
+            botId: string;
+            botName: string;
+            widgetKey: string;
+        };
+        OrganizationBotRow: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            slug: string;
+            /** Format: int64 */
+            userMessages: number;
+        };
+        OrganizationRow: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            slug: string;
+            plan: string;
+            status: string;
+            companyName?: string | null;
+            nip?: string | null;
+            /**
+             * Format: int64
+             * @description Pooled — suma wiadomości wszystkich botów organizacji.
+             */
+            userMessages: number;
+            /**
+             * Format: int32
+             * @description -1 = bez limitu.
+             */
+            effectiveLimit: number;
+            bots: components["schemas"]["OrganizationBotRow"][];
+            /** @description ISO 8601 (instant). */
+            createdAt: string;
+        };
+        CreateOrganizationRequest: {
+            name: string;
+            /** Format: email */
+            ownerEmail: string;
+            /** @example FREE */
+            plan: string;
+            companyName?: string | null;
+            nip?: string | null;
+            firstBotName?: string | null;
+            firstBotUrl?: string | null;
+        };
+        /** @description Dane provisioningu — hasło i klucz widgetu pokazywane RAZ. */
+        ProvisionResponse: {
+            /** Format: uuid */
+            organizationId: string;
+            organizationName: string;
+            ownerEmail: string;
+            generatedPassword: string;
+            /** Format: uuid */
+            firstBotId: string;
+            firstBotName: string;
+            widgetKey: string;
+        };
+        BillingUsageResponse: {
+            plan: string;
+            planName: string;
+            /** Format: int32 */
+            monthlyMessagesLimit: number;
+            /** Format: int32 */
+            effectiveLimit: number;
+            /** Format: int64 */
+            userMessages: number;
+            /** Format: int64 */
+            aiMessages: number;
+            /** @description Data początku okresu rozliczeniowego (ISO YYYY-MM-DD, pierwszy dzień miesiąca). */
+            periodMonth: string;
+            /** @description ISO 8601 — początek następnego miesiąca. */
+            resetsAt: string;
+            /** Format: int64 */
+            remainingDays: number;
+            /** Format: double */
+            percentUsed: number;
+            unlimited: boolean;
+        };
+        BillingPlanResponse: {
+            code: string;
+            name: string;
+            /** Format: int32 */
+            monthlyMessagesLimit: number;
+            /** Format: int32 */
+            effectiveLimit: number;
+            /**
+             * Format: int32
+             * @description NULL = bez limitu botów.
+             */
+            maxBots?: number | null;
+            customDomainAllowed: boolean;
+            apiAccessAllowed: boolean;
+            /**
+             * Format: int32
+             * @description Cena miesięczna w PLN (całe złote). NULL = custom pricing.
+             */
+            pricePlnMonthly?: number | null;
+        };
+        WidgetOriginsRequest: {
+            /** @description Lista URLi/originów; serwer normalizuje do origin. Pusta = działa wszędzie. */
+            origins: string[];
+        };
+        WidgetOriginsResponse: {
+            origins: string[];
+        };
+        TurnstileConfigResponse: {
+            enabled: boolean;
+            siteKey: string;
         };
         /** @description Response zawierający tylko ID utworzonego zasobu */
         IdResponse: {
@@ -1502,6 +1877,321 @@ export interface operations {
                 };
             };
             500: components["responses"]["InternalServerError"];
+        };
+    };
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Zalogowano — zwraca bieżącego użytkownika */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Wylogowano */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getCurrentUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    switchActiveBot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ActiveBotRequest"];
+            };
+        };
+        responses: {
+            /** @description Przełączono — zwraca aktywnego bota */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BotSummary"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getBotLimit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BotLimitResponse"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+        };
+    };
+    addOwnerBot: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddBotRequest"];
+            };
+        };
+        responses: {
+            /** @description Utworzono bota */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddBotResponse"];
+                };
+            };
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    listOrganizations: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["OrganizationRow"][];
+                };
+            };
+        };
+    };
+    createOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateOrganizationRequest"];
+            };
+        };
+        responses: {
+            /** @description Utworzono organizację */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProvisionResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            409: components["responses"]["Conflict"];
+        };
+    };
+    addBotToOrganization: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                orgId: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddBotRequest"];
+            };
+        };
+        responses: {
+            /** @description Utworzono bota */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AddBotResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getBillingUsage: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingUsageResponse"];
+                };
+            };
+        };
+    };
+    getBillingPlan: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BillingPlanResponse"];
+                };
+            };
+        };
+    };
+    getWidgetOrigins: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetOriginsResponse"];
+                };
+            };
+        };
+    };
+    updateWidgetOrigins: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WidgetOriginsRequest"];
+            };
+        };
+        responses: {
+            /** @description Zapisane (znormalizowane) */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetOriginsResponse"];
+                };
+            };
+        };
+    };
+    getTurnstileConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TurnstileConfigResponse"];
+                };
+            };
         };
     };
 }

@@ -1,28 +1,9 @@
 import { useQuery } from '@tanstack/react-query';
+import type { components } from '@/api/schema';
 
-export interface BillingUsage {
-  plan: string;
-  planName: string;
-  monthlyMessagesLimit: number;
-  effectiveLimit: number;
-  userMessages: number;
-  aiMessages: number;
-  periodMonth: string;
-  resetsAt: string;
-  remainingDays: number;
-  percentUsed: number;
-  unlimited: boolean;
-}
-
-export interface BillingPlanInfo {
-  code: string;
-  name: string;
-  monthlyMessagesLimit: number;
-  effectiveLimit: number;
-  customDomainAllowed: boolean;
-  apiAccessAllowed: boolean;
-  pricePlnMonthly: number | null;
-}
+// Typy z kontraktu (openapi.yaml → schema.ts).
+export type BillingUsage = components['schemas']['BillingUsageResponse'];
+export type BillingPlanInfo = components['schemas']['BillingPlanResponse'];
 
 async function fetchUsage(): Promise<BillingUsage> {
   const r = await fetch('/api/admin/billing/usage', { credentials: 'same-origin' });
