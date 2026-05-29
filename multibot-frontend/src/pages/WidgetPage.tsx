@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Copy, Check, Save } from 'lucide-react';
+import { Copy, Check, Save, Plus, X } from 'lucide-react';
 import { toast } from 'sonner';
 import { Topbar } from '@/components/layout/Topbar';
 import { Button } from '@/components/ui/button';
@@ -35,24 +35,40 @@ export function WidgetPage() {
   const origins = useWidgetOrigins();
   const updateOrigins = useUpdateWidgetOrigins();
   const [draft, setDraft] = useState<Settings | null>(null);
-  const [originsText, setOriginsText] = useState<string | null>(null);
+  const [originsList, setOriginsList] = useState<string[] | null>(null);
+  const [newOrigin, setNewOrigin] = useState('');
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
-    if (origins.data && originsText === null) {
-      setOriginsText(origins.data.join('\n'));
+    if (origins.data && originsList === null) {
+      setOriginsList(origins.data);
     }
-  }, [origins.data, originsText]);
+  }, [origins.data, originsList]);
 
-  const handleSaveOrigins = () => {
-    const list = (originsText ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
+  // Auto-zapis przy dodaniu/usunięciu domeny — bez osobnego przycisku.
+  const persistOrigins = (list: string[]) => {
+    setOriginsList(list);
     updateOrigins.mutate(list, {
-      onSuccess: (saved) => {
-        toast.success('Dozwolone domeny zapisane');
-        setOriginsText(saved.join('\n'));
+      onSuccess: (saved) => setOriginsList(saved),
+      onError: (err) => {
+        showApiError(err, 'Nie udało się zapisać domen');
+        setOriginsList(origins.data ?? []);   // cofnij na ostatni zapisany stan
       },
-      onError: (err) => showApiError(err, 'Nie udało się zapisać domen'),
     });
+  };
+
+  const addOrigin = () => {
+    const v = newOrigin.trim();
+    if (!v) return;
+    const current = originsList ?? [];
+    if (current.includes(v)) { setNewOrigin(''); return; }
+    persistOrigins([...current, v]);
+    setNewOrigin('');
+  };
+
+  const removeOrigin = (idx: number) => {
+    const current = originsList ?? [];
+    persistOrigins(current.filter((_, i) => i !== idx));
   };
 
   useEffect(() => {
@@ -144,23 +160,42 @@ export function WidgetPage() {
               <div>
                 <CardTitle>Dozwolone domeny</CardTitle>
                 <CardSubtitle>
-                  Widget zadziała tylko na tych domenach (jedna na linię). Pusto = działa wszędzie (tylko do testów).
+                  Widget zadziała tylko na dodanych domenach. Brak = działa wszędzie (tylko do testów).
                 </CardSubtitle>
               </div>
-              <Button variant="secondary" onClick={handleSaveOrigins} disabled={updateOrigins.isPending || originsText === null}>
-                <Save className="size-3.5" />
-                {updateOrigins.isPending ? 'Zapisuję…' : 'Zapisz domeny'}
-              </Button>
             </CardHeader>
-            <CardBody>
-              <Textarea
-                value={originsText ?? ''}
-                onChange={(e) => setOriginsText((e.target as HTMLTextAreaElement).value)}
-                rows={3}
-                placeholder={'https://twojadomena.pl\nhttps://www.twojadomena.pl'}
-                className="mono text-[12.5px]"
-                disabled={origins.isPending}
-              />
+            <CardBody className="space-y-2">
+              {(originsList ?? []).length === 0 && !origins.isPending && (
+                <p className="text-[12px] text-text-dim">
+                  Brak domen — widget działa na każdej stronie. Dodaj domenę, żeby go zabezpieczyć.
+                </p>
+              )}
+              {(originsList ?? []).map((o, i) => (
+                <div key={`${o}-${i}`} className="flex items-center justify-between gap-2 bg-bg-elevated rounded-md px-3 py-2">
+                  <span className="text-[13px] mono truncate">{o}</span>
+                  <button
+                    onClick={() => removeOrigin(i)}
+                    disabled={updateOrigins.isPending}
+                    className="text-text-muted hover:text-error size-7 flex items-center justify-center rounded hover:bg-bg-panel shrink-0 disabled:opacity-50"
+                    title="Usuń domenę"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                </div>
+              ))}
+              <div className="flex gap-2 pt-1">
+                <Input
+                  value={newOrigin}
+                  onChange={(e) => setNewOrigin((e.target as HTMLInputElement).value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); addOrigin(); } }}
+                  placeholder="https://twojadomena.pl"
+                  className="flex-1 mono text-[12.5px]"
+                  disabled={origins.isPending}
+                />
+                <Button variant="secondary" onClick={addOrigin} disabled={!newOrigin.trim() || updateOrigins.isPending}>
+                  <Plus className="size-3.5" /> Dodaj
+                </Button>
+              </div>
             </CardBody>
           </Card>
 
