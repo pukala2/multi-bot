@@ -8,10 +8,14 @@ Szczegóły izolacji tenantów → [multi-tenancy.md](multi-tenancy.md).
 
 ## 1. Słownik pojęć
 
+> **Aktualizacja (pivot Organizacja→Boty):** „Tenant" znaczy teraz **bot** (granica izolacji danych), a klientem
+> platformy jest **Organizacja** (może mieć wiele botów). Pełny model: [multi-tenancy.md](multi-tenancy.md).
+
 | Pojęcie | Znaczenie |
 |---------|-----------|
-| **Tenant** | Firma-klient platformy. Jeden Tenant = jeden chatbot ze swoimi dokumentami. |
-| **Admin** | Użytkownik panelu po stronie Tenanta (pracownik firmy-klienta). Loguje się, wgrywa pliki, ogląda statystyki. |
+| **Organizacja** | Firma-klient platformy (konto). Trzyma plan, limit wiadomości (wspólny dla botów), dane firmowe. Może mieć wiele botów. |
+| **Tenant / Bot** | Pojedynczy chatbot ze swoimi dokumentami, widgetem, sesjami. Granica izolacji danych (`tenant_id`). Należy do organizacji. |
+| **Admin / Owner** | Użytkownik panelu po stronie klienta (należy do organizacji). Loguje się, zarządza botami, wgrywa pliki. `SUPER_ADMIN` zarządza całą platformą. |
 | **End user** | Użytkownik końcowy, który rozmawia z botem - klient firmy-Tenanta. Anonimowy lub identyfikowany przez `external_id`. |
 | **Document** | Plik wgrany przez Admina (PDF, DOCX, TXT, MD). Po przetworzeniu staje się źródłem wiedzy dla bota. |
 | **Chunk** | Fragment dokumentu (~500 tokenów) z wygenerowanym embeddingiem, zapisany w vector store. |

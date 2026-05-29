@@ -1,5 +1,9 @@
 # Flow: Chat z RAG (Retrieval Augmented Generation)
 
+> **Aktualizacja:** mechanika RAG bez zmian. Terminologia: `tenant` = **bot** (granica izolacji). Anonimowy
+> widget przechodzi przez `WidgetGuardFilter` (klucz+origin+rate-limit+Turnstile). Przed RAG sprawdzany jest
+> **wspólny limit wiadomości organizacji** (suma botów) → po przekroczeniu `402 PAYMENT_REQUIRED`, bot nie odpowiada.
+
 Pełen flow od wiadomości End usera do wystreamowanej odpowiedzi bota z cytowaniem źródeł.
 
 **Diagram:** [`../diagrams/chat-rag-flow.puml`](../diagrams/chat-rag-flow.puml)

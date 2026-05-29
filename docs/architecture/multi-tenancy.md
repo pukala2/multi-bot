@@ -1,251 +1,147 @@
-# Multi-tenancy - strategia izolacji tenantów
+# Multi-tenancy — model Organizacja → Boty i izolacja danych
 
-Najważniejszy dokument architektoniczny. Decyduje jak wszystko inne w kodzie wygląda.
+Najważniejszy dokument architektoniczny. Decyduje jak wygląda reszta kodu.
 
-**Cel:** zaprojektować izolację tenantów tak, żeby w MVP działać jako "single-tenant" (`tenant_id=1` hardcoded), a przejście na realny multi-tenant było zmianą **konfiguracji**, nie refactorem.
-
----
-
-## 1. Strategia - co wybieramy
-
-Trzy typowe podejścia do multi-tenancy w aplikacjach SaaS:
-
-| Podejście | Izolacja danych | Złożoność | Skalowalność | Koszt |
-|-----------|-----------------|-----------|--------------|-------|
-| **Pool model** (shared DB, shared schema, `tenant_id` kolumna) | Logiczna - na poziomie aplikacji | Niska | Łatwa do dziesiątek tysięcy tenantów | Niski |
-| **Schema-per-tenant** | Fizyczna - osobny schemat per tenant | Średnia | Ograniczona (Postgres ~tysiące schematów) | Średni |
-| **Database-per-tenant** | Pełna - osobna baza | Wysoka | Operacyjnie trudna | Wysoki |
-
-**Decyzja: Pool model.**
-
-Każda tabela ma kolumnę `tenant_id`. Jedna instancja aplikacji, jedna baza, jeden schemat. Izolacja na poziomie kodu - przez systematyczne filtrowanie po `tenant_id` w każdym query.
-
-**Uzasadnienie:**
-- Prostota operacyjna: jeden deployment, jeden backup, jedne migracje Flyway
-- Wystarczy na pierwsze 50-500 klientów
-- Najtańsze - dziesiątki tenantów na jednej małej instancji Postgres
-- Łatwa migracja w przyszłości do schema-per-tenant, jeśli pojawi się klient z wymogami compliance (medyczne, bankowe)
-
+> **Aktualizacja:** dokument opisuje model **po pivocie Organizacja→Boty** (oraz po dodaniu auth/billingu).
+> Wcześniejsze wersje zakładały płaski model „tenant = klient" i JWT — to już nieaktualne.
 
 ---
 
-## 2. TenantContext - serce systemu
+## 1. Dwa poziomy: Organizacja i Bot (tenant)
 
-Jedna, statyczna abstrakcja odpowiadająca na pytanie: **"kto teraz pyta?"**.
+```
+Organizacja (klient, konto)           <- plan, limit wiadomości, dane firmowe (NIP)
+  ├── Bot A  (tenant_id)              <- granica izolacji danych: dokumenty, wektory, sesje, widget
+  ├── Bot B  (tenant_id)
+  └── Bot C  (tenant_id)
+Użytkownik (OWNER/ADMIN)  -> należy do ORGANIZACJI (nie do pojedynczego bota)
+SUPER_ADMIN              -> ponad organizacjami (bez organizacji)
+```
 
-**Klasa:** `TenantContext`
+- **Organizacja** = konto klienta. Trzyma **plan** (FK `billing_plans`), **limit wiadomości** (wspólny dla wszystkich botów), **limit liczby botów** (`max_bots`), dane firmowe.
+- **Bot = tenant** = granica izolacji danych. Każdy bot ma własne dokumenty, chunki (wektory), wersje, widget+klucz, sesje czatu, licznik zużycia. Wszystkie tabele danych mają kolumnę `tenant_id` = id bota.
+- **Użytkownik** należy do organizacji (`users.organization_id`), więc jeden owner zarządza wszystkimi botami swojej organizacji. SUPER_ADMIN nie ma organizacji.
 
-**Odpowiedzialność:**
-- Przechowuje `tenant_id` aktywnego requestu
-- Udostępnia go *każdemu* miejscu w kodzie (repository, vector store, file storage, logger)
-- Jest jedynym źródłem prawdy - nikt nie czyta tenant_id z JWT bezpośrednio, wszyscy chodzą przez TenantContext
+> Wewnętrznie w kodzie nadal mówimy „tenant" (klasa `TenantId`, `@TenantId`, `TenantContext`) — to po prostu **id bota**. W UI/API klienta nazywamy to „bot".
 
-**Mechanizm:**
-- `ThreadLocal<Long>` - bo Spring używa modelu thread-per-request
-- Statyczne metody: `set(tenantId)`, `get()`, `clear()`
-- `get()` rzuca wyjątek jeśli kontekst nie ustawiony - lepiej crash niż cichy fallback do "default"
-
-**Lifecycle:**
-1. Filter na początku requestu: `TenantContext.set(...)`
-2. Cały request korzysta - serwisy, repozytoria, Spring AI
-3. Filter w `finally`: `TenantContext.clear()` - **krytyczne**, bo Spring używa thread poola i bez czyszczenia następny request mógłby odziedziczyć tenant_id
-
-**Tryb MVP:**
-- Filter zawsze ustawia `1L` bez patrzenia na request
-- TenantContext API się nie zmienia - serwisy w ogóle nie wiedzą że to "MVP mode"
-
-**Tryb produkcyjny:**
-- Filter dekoduje JWT, wyciąga claim `tenant_id`, waliduje, ustawia
-- Reszta kodu - bez zmian
+**Strategia izolacji: Pool model.** Jedna baza, jeden schemat, kolumna `tenant_id` na każdej tabeli danych. Izolacja przez systematyczne filtrowanie po `tenant_id`. Tanie i wystarczające na pierwsze setki klientów; łatwa późniejsza migracja do schema-per-tenant.
 
 ---
 
-## 3. Filter ustawiający TenantContext
+## 2. TenantContext — serce systemu
 
-**Klasa:** `TenantContextFilter extends OncePerRequestFilter`
+**Klasa:** `com.multibot.tenancy.TenantContext`
 
-**Odpowiedzialność:**
-- Ustawić TenantContext na początku każdego requestu
-- Wyczyścić w `finally` (nawet jeśli leci wyjątek)
+- Przechowuje `TenantId` (UUID) **aktywnego bota** dla bieżącego requestu w `ThreadLocal`.
+- API: `set(TenantId)`, `get()` (rzuca `IllegalStateException` gdy nie ustawiony — lepiej crash niż cichy fallback), `tryGet()` (Optional), `clear()`.
+- Jedyne źródło prawdy — repozytoria, vector store, file storage, logger chodzą przez `TenantContext`, nikt nie czyta tenanta z sesji/żądania bezpośrednio.
 
-**Tryby:**
-
-| Tryb | Źródło tenant_id | Walidacja |
-|------|------------------|-----------|
-| **MVP** (`multibot.tenancy.mode=mock`) | Stała `1L` | brak |
-| **JWT** (`multibot.tenancy.mode=jwt`) | Claim `tenant_id` w JWT | walidacja podpisu + istnienie tenanta w bazie |
-| **Header** (`multibot.tenancy.mode=header`) | Nagłówek `X-Tenant-Id` | dla widgetu - tenant_id wyciągany z widget keya |
-
-Tryb wybierany flagą w `application.properties`. Wszystkie 3 implementacje wstrzykiwane warunkowo (Spring `@ConditionalOnProperty`).
-
-**Kolejność filtrów:**
-1. CORS filter
-2. **TenantContextFilter** (ten)
-3. Spring Security filter (post-MVP)
-4. Controller
-
-TenantContext musi być ustawiony **przed** Spring Security, bo audyty bezpieczeństwa mogą się o niego opierać.
+**Lifecycle:** `TenantContextFilter` ustawia kontekst na początku requestu i **czyści w `finally`** (krytyczne — Spring używa thread-poola; bez `clear()` następny request odziedziczyłby tenant).
 
 ---
 
-## 4. Hibernate `@TenantId` - automatyczne filtrowanie
+## 3. Rozwiązywanie aktywnego bota — TenantResolver
 
-**Po co:** żeby `SELECT * FROM documents WHERE id = ?` automatycznie stał się `SELECT * FROM documents WHERE id = ? AND tenant_id = ?`. Bez tego każdy programista musiałby pamiętać o filtrze - i prędzej czy później ktoś zapomni.
+`TenantContextFilter` deleguje do `TenantResolver` (interfejs). Tryb wybierany flagą `multibot.tenancy.mode`:
 
-**Klasy:**
-- `TenantIdResolver implements CurrentTenantIdentifierResolver<Long>` - mówi Hibernate jaki jest obecny tenant. Pobiera z `TenantContext.get()`.
-- Każda encja JPA ma pole `@TenantId Long tenantId` (Hibernate 6 native annotation)
+| Tryb | Implementacja (`@ConditionalOnProperty`) | Źródło tenanta |
+|------|------------------------------------------|----------------|
+| `mock` (domyślny, też testy) | `MockTenantResolver` | stały DEFAULT tenant `00000000-…-0001` |
+| `auth` (produkcja) | `AuthenticatedTenantResolver` | aktywny bot z sesji (kolejność niżej) |
 
-**Co dzieje się automatycznie:**
+**`AuthenticatedTenantResolver` — kolejność:**
+1. **Impersonacja** — atrybut sesji `impersonatedTenantId` (super admin „wejdź jako klient", planowane).
+2. **Aktywny bot** — atrybut sesji `activeBotTenantId`, ustawiany przy **loginie** (auto-wybór pierwszego bota organizacji) i przy **przełączniku** (`POST /api/auth/active-bot`, po walidacji że bot należy do organizacji usera).
+3. **Fallback** — zalogowany owner bez wybranego bota (np. sesja sprzed wdrożenia) → auto-wybór pierwszego bota org i zapis w sesji.
+4. **Widget (anonim)** — `WidgetGuardFilter` po walidacji `X-Multibot-Widget-Key` + Origin + rate-limit wrzuca `tenant_id` w atrybut requestu; resolver go odczytuje.
+5. Brak → `TenantContext.get()` rzuci błędem (zamierzone — np. SUPER_ADMIN na endpointcie klienta).
+
+> **Auth = sesje (cookie), NIE JWT.** Spring Security 6.4 + Spring Session JDBC (sesje w Postgres). Login `POST /api/auth/login`, logout, `GET /api/auth/me` (zwraca usera + `organizationId` + `activeBot` + listę `bots`). CSRF: `XSRF-TOKEN` cookie + nagłówek `X-XSRF-TOKEN`.
+
+**Kolejność filtrów (tryb auth):** filtry tenancy są wpięte **wewnątrz** łańcucha Spring Security (po autoryzacji), bo resolver czyta `SecurityContext`:
+```
+… Spring Security (auth + AuthorizationFilter) → WidgetGuardFilter → TenantContextFilter → Controller
+```
+(`TenantContextFilter` ma wyłączoną auto-rejestrację jako globalny servlet filter — `FilterRegistrationBean(enabled=false)` — i jest dodawany do chaina przez `addFilterAfter`.)
+
+---
+
+## 4. Hibernate `@TenantId` — automatyczne filtrowanie
+
+Żeby `findById` automatycznie stał się `… AND tenant_id = ?`. Bez tego ktoś prędzej czy później zapomni o filtrze.
+
+- Każda encja danych ma pole `@TenantId UUID tenantId` (Hibernate 6 native).
+- `TenantIdResolver implements CurrentTenantIdentifierResolver<UUID>` — pobiera z `TenantContext.get()`.
+- Konfiguracja: `HibernateTenancyCustomizer`.
 
 | Operacja | Co dodaje Hibernate |
 |----------|---------------------|
-| SELECT (`findById`, `findAll`, JPQL, criteria) | `WHERE tenant_id = :currentTenant` |
-| INSERT (`save` nowej encji) | `tenantId` ustawiany przed insertem |
-| UPDATE | warunek `WHERE tenant_id = :currentTenant` |
-| DELETE | warunek `WHERE tenant_id = :currentTenant` |
+| SELECT / UPDATE / DELETE | `WHERE tenant_id = :current` |
+| INSERT | `tenant_id` ustawiany przed insertem |
 
-**Czego NIE robi automatycznie:**
-- Native SQL queries (`@Query(nativeQuery = true)`) - musisz dodać `WHERE tenant_id = :tenantId` ręcznie
-- `JdbcTemplate` - całkowicie poza Hibernate, ręczna kontrola
-- Spring AI VectorStore - to nie JPA, własny mechanizm filtrowania (patrz sekcja 5)
-
-**Zasada:** jeśli czegoś nie da się załatwić przez JPA - osobna lista "uważaj" w [`backend.md`](backend.md).
+**Nie obejmuje automatycznie:** native SQL (`@Query(nativeQuery=true)`), `JdbcTemplate`, pgvector — tam filtrujemy ręcznie.
 
 ---
 
-## 5. pgvector - filtrowanie wektorów
+## 5. pgvector — filtrowanie wektorów
 
-Vector search w Spring AI nie wie nic o Hibernate `@TenantId`. To osobny świat - musimy filtrować świadomie.
-
-**Schemat:** chunki w pgvector mają kolumnę `metadata` (JSONB) zawierającą m.in. `tenant_id`, `document_id`, `page_number`.
-
-**Mechanizm filtrowania:**
-- Spring AI udostępnia `SearchRequest` z polem `filterExpression`
-- Każde wyszukiwanie buduje filter w stylu: `metadata['tenant_id'] == :currentTenantId`
-- Klasa `TenantAwareVectorStore` (decorator nad Spring AI `VectorStore`) wymusza ten filtr przed delegacją do prawdziwego store
-
-**Klucz:** developer **nigdy nie wywołuje** `VectorStore.search()` bezpośrednio. Zawsze przez `TenantAwareVectorStore`. To wymusza filtr na poziomie typu - nie da się zapomnieć.
-
-Analogiczna walidacja przy zapisie chunka: `tenant_id` z TenantContext jest dopisywany do metadata przy każdym `add()`.
+Chunki mają kolumnę `tenant_id`. Wyszukiwanie wektorowe filtruje po `tenant_id` z `TenantContext` (poza Hibernate, świadomie). Zapis chunka dopisuje `tenant_id` aktywnego bota. Szczegóły: [`../database/pgvector.md`](../database/pgvector.md).
 
 ---
 
-## 6. File storage - izolacja na poziomie ścieżek
+## 6. File storage — izolacja po ścieżkach
 
-**Klasa:** `FileStorageService` (interfejs) + `LocalFileStorage` (impl. MVP) / `S3FileStorage` (impl. produkcyjna)
-
-**Konwencja ścieżek:**
 ```
-./storage/
-├── tenants/
-│   ├── 1/
-│   │   ├── documents/
-│   │   │   ├── {document_uuid}.pdf
-│   │   │   └── ...
-│   ├── 2/
-│   │   └── ...
+./storage/tenants/{tenant_id}/files/{file_uuid}.<ext>
 ```
-
-**Walidacja:**
-- `FileStorageService.read(documentId)` i `.write(documentId, bytes)` zawsze konstruuje ścieżkę z `TenantContext.get()`
-- Brak metody pozwalającej podać `tenant_id` z zewnątrz - eliminuje błąd "podałem cudzy tenant"
-- Dodatkowo: walidacja po stronie serwisu - dokument z DB ma `tenant_id == TenantContext.get()` przed otwarciem pliku
+`FileStorageService` konstruuje ścieżkę z `TenantContext.get()` — brak metody z `tenant_id` z zewnątrz. `tenant_id` = id bota.
 
 ---
 
-## 7. Belt-and-suspenders - walidacja w serwisach
+## 7. Billing — limit wiadomości wspólny (pooled) na organizację
 
-Mimo automatycznego filtrowania Hibernate, każdy serwis manipulujący zasobem **ręcznie weryfikuje** że zasób należy do aktualnego tenanta. Defense in depth.
-
-**Wzorzec:**
-```
-Document doc = documentRepository.findById(id).orElseThrow(NotFoundException::new);
-TenantSecurityCheck.assertSameTenant(doc);  // rzuca ForbiddenException jeśli się nie zgadza
-```
-
-**Klasa:** `TenantSecurityCheck` - statyczne metody pomocnicze typu `assertSameTenant(TenantOwned entity)`.
-
-**Interfejs:** `TenantOwned` - implementowany przez każdą encję która ma `tenant_id`. Metoda `getTenantId()`.
-
-**Po co skoro Hibernate i tak filtruje:**
-1. **Łapie błędy w native query** - jeśli ktoś napisze `@Query(nativeQuery=true)` bez filtru, Hibernate `@TenantId` nie pomoże, ale `assertSameTenant` tak
-2. **Łapie błędy w JdbcTemplate** - jw.
-3. **Defense in depth** - nawet jeśli ktoś zepsuje konfigurację Hibernate (np. wyłączy filter), serwisy nadal blokują dostęp
-4. **Lepsze błędy** - `ForbiddenException` (403) zamiast `NotFoundException` (404) dla "to istnieje ale nie twoje" - choć z punktu widzenia bezpieczeństwa 404 jest preferowane (nie zdradza istnienia zasobu)
-
-W praktyce: 404 dla user-facing endpointów, 500 + alert dla wewnętrznych - bo to bug.
+- Plan i `monthly_messages_limit` (+ override) są na **organizacji**, nie na bocie.
+- Zużycie liczone **per bot** (`tenant_usage`) — dla analityki, ale **limit sprawdzany jest jako SUMA wiadomości wszystkich botów organizacji** vs limit planu.
+- `BillingService.check(tenantId)` rozwiązuje organizację bota i sumuje zużycie po wszystkich jego botach (`sumUserMessagesForOrgOf`). Po przekroczeniu — `402 PAYMENT_REQUIRED`.
+- Limit liczby botów (`max_bots`: Free 1 / Basic 2 / Pro 3 / Enterprise ∞ lub override) — egzekwowany przy self-serve `POST /api/bots`.
 
 ---
 
-## 8. Co się zmienia: MVP → multi-tenant
+## 8. Anonimowy widget — bezpieczeństwo
 
-Cały sens designu: switch flagi, **nie refactor**.
-
-| Element | MVP | Po włączeniu multi-tenant | Zmiana |
-|---------|-----|---------------------------|--------|
-| TenantContext API | `get() == 1L` zawsze | `get() == <z JWT>` | **żadna** w callerach |
-| TenantContextFilter | hardcoded `set(1L)` | dekoduje JWT, ustawia | konfiguracja: `multibot.tenancy.mode=mock → jwt` |
-| Spring Security | brak | włączone (`SecurityFilterChain`) | nowy bean, nowe filtry |
-| Encje JPA | mają `@TenantId` | mają `@TenantId` | **żadna** |
-| Repository | bez zmian | bez zmian | **żadna** |
-| Vector store | `TenantAwareVectorStore` filtruje 1 | filtruje realny tenant | **żadna** w callerach |
-| File storage | `./storage/tenants/1/...` | `./storage/tenants/{realny}/...` | **żadna** w callerach |
-| Logi | `tenant_id=1` w MDC | `tenant_id=<realny>` w MDC | **żadna** |
-| Tabela `tenants` | jeden rekord (id=1, name="default") | wiele rekordów | dane (Flyway seed) |
-| Endpoint `/auth/login` | nie istnieje | dodajemy | nowy controller |
-| Endpoint `/admin/tenants` | nie istnieje | dodajemy (super-admin) | nowy controller |
-
-**Suma zmian przy przełączeniu:** 1 property, 1 filter (z mock na JWT), Spring Security beans, endpoint auth, endpoint admin. Cała reszta - 90%+ kodu - bez modyfikacji.
+Endpointy czatu (`POST /api/chat/sessions[/…/messages]`) są `permitAll`, ale chroni je `WidgetGuardFilter`:
+- request zalogowanego usera (test czatu w panelu) → przepuszczany;
+- anonimowy widget → wymaga `X-Multibot-Widget-Key` + dozwolony Origin, rate-limit per IP/sesja, opcjonalnie Cloudflare Turnstile; po walidacji wrzuca `tenant_id` w atrybut requestu dla resolvera.
 
 ---
 
-## 9. Zasady i pułapki
+## 9. Czerwone zasady (NIE łamać)
 
-### Czerwone zasady (NIE łamać)
-
-1. **Nigdy nie odczytuj `tenant_id` z requestu / JWT bezpośrednio.** Zawsze przez `TenantContext.get()`. Pojedyncze źródło prawdy.
-
-2. **Nigdy nie pisz native SQL bez `WHERE tenant_id = ?`.** Hibernate `@TenantId` nie filtruje native queries.
-
-3. **Nigdy nie używaj `VectorStore` bez `TenantAwareVectorStore`.** Spring AI VectorStore nie wie o tenantach.
-
-4. **Nigdy nie konstruuj ścieżki do pliku z user input.** Tylko przez `FileStorageService`, który dokleja `tenant_id`.
-
-5. **Nigdy nie zapominaj o `TenantContext.clear()` w `finally`.** Pozostały kontekst w thread poolu = wyciek tenant_id między requestami.
+1. Nigdy nie czytaj tenanta z sesji/żądania bezpośrednio — zawsze `TenantContext.get()`.
+2. Native SQL / `JdbcTemplate` na danych tenantowych — zawsze `WHERE tenant_id = ?` ręcznie.
+3. Vector search / zapis chunków — zawsze z filtrem `tenant_id`.
+4. Ścieżki plików — tylko przez `FileStorageService`.
+5. Zawsze `TenantContext.clear()` w `finally`.
+6. Plan/limit/dane firmowe to poziom **organizacji** — nie duplikuj ich na bocie.
 
 ### Pułapki
+- `@Async` / background / Spring Events asynchroniczne — nowy wątek = nowy ThreadLocal; propaguj `TenantContext` (`TenantAwareTaskDecorator`).
+- SSE czatu — strumień żyje dłużej niż request; tenant ustawiany przy starcie.
+- Testy — w profilu `test` (`mode=mock`) resolver zwraca DEFAULT tenant; ITy HTTP wymagające auth logują się przez `AuthenticatedIntegrationTestBase`. Testy DB ustawiają `TenantContext` ręcznie.
 
-- **`@Async` i background jobs** - nowy wątek = nowy ThreadLocal. Trzeba ręcznie propagować TenantContext do wątku workera. Klasa pomocnicza: `TenantAwareExecutor`.
-- **Spring Events (`@EventListener`)** - synchroniczne dziedziczą wątek, asynchroniczne nie. Jak wyżej.
-- **Scheduled tasks (`@Scheduled`)** - nie mają tenanta z definicji. Muszą same iterować po tenantach jeśli robią coś per-tenant.
-- **WebSocket / SSE long-lived connections** - tenant ustawiany przy uchwyceniu connection, ale strumień odpowiedzi może żyć dłużej niż request. Wymaga osobnej logiki.
-- **Testy** - testy integracyjne muszą ustawiać TenantContext ręcznie. Helper: `@WithTenant(1L)` adnotacja.
-
-### Checklist dla nowego endpointu
-
-Przed code review, autor sprawdza:
-- [ ] Operuje tylko na encjach z `@TenantId`?
-- [ ] Jeśli native query - ma `WHERE tenant_id = ?`?
-- [ ] Jeśli vector search - przez `TenantAwareVectorStore`?
-- [ ] Jeśli operacja na pliku - przez `FileStorageService`?
-- [ ] Jest `TenantSecurityCheck.assertSameTenant(...)` w serwisie?
-- [ ] Test sprawdza że tenant A nie widzi danych tenant B?
-
----
-
-## 10. Lifecycle requestu - diagram
-
-**Diagram sekwencji:** [`../diagrams/request-with-tenant-context.puml`](../diagrams/request-with-tenant-context.puml)
-
-Pokazuje pełną ścieżkę requestu HTTP od klienta do bazy, z miejscami gdzie TenantContext jest ustawiany, odczytywany przez Hibernate, i czyszczony.
+### Checklist nowego endpointu klienta
+- [ ] Operuje na encjach z `@TenantId` (albo native query z `WHERE tenant_id = ?`)?
+- [ ] Vector / plik — przez właściwe abstrakcje?
+- [ ] Test sprawdza izolację (bot A nie widzi danych bota B)?
+- [ ] Jeśli endpoint zależny od bota — czy SUPER_ADMIN (bez aktywnego bota) jest poprawnie obsłużony / ukryty w UI?
 
 ---
 
 ## Linki dalej
 
-| Chcesz wiedzieć... | Idź do... |
+| Chcesz wiedzieć… | Idź do… |
 |--------------------|-----------|
-| Jak `tenant_id` wygląda w schemacie bazy | [`../database/schema.md`](../database/schema.md) |
-| Konkretne klasy i pakiety implementujące powyższe | [`backend.md`](backend.md) |
-| Jak filtrujemy pgvector technicznie | [`../database/pgvector.md`](../database/pgvector.md) |
+| Schemat bazy (organizations, tenants, users, billing) | [`../database/schema.md`](../database/schema.md) |
+| Lista endpointów (auth, bots, super-admin, billing) | [`../api/endpoints.md`](../api/endpoints.md) |
+| Moduły backendu | [`backend/modules-business.md`](backend/modules-business.md) |
+| Filtrowanie pgvector | [`../database/pgvector.md`](../database/pgvector.md) |

@@ -103,29 +103,22 @@ https://TWOJA_DOMENA/actuator/health → {"status":"UP"}
 Zaloguj się super adminem (z .env). HTTPS Caddy ogarnia sam przy pierwszym wejściu
 (może chwilę potrwać zanim wyrobi cert).
 
-## 9. Tenant znajomego (przez SQL — Faza D UI jeszcze nie ma)
+## 9. Klient znajomego (przez panel super admina — bez SQL)
 
-```bash
-docker exec -it multibot-postgres psql -U multibot -d multibot
-```
+Model: **Organizacja (klient) → Boty**. Super admin tworzy organizację z pierwszym botem; panel sam
+generuje konto OWNER (hasło), bota, wersję v1 i klucz widgeta.
 
-W psql (podstaw dane znajomego):
-```sql
--- nowy tenant
-INSERT INTO tenants (id, name, slug, plan, status, created_at, updated_at)
-VALUES (gen_random_uuid(), 'Firma Znajomego', 'znajomy', 'FREE', 'ACTIVE', now(), now());
+1. Wejdź na `https://TWOJA_DOMENA`, zaloguj się **super adminem** (z `.env`).
+2. Sekcja **„Klienci" → „Nowa organizacja"**: nazwa, email właściciela, plan (`FREE`/`BASIC`/`PRO`),
+   opcjonalnie nazwa firmy + NIP + nazwa pierwszego bota.
+3. Modal pokaże **RAZ**: login, wygenerowane hasło i **klucz widgeta** — przekaż znajomemu.
+4. Kolejne boty tej samej organizacji: „Dodaj bota" przy organizacji (lub klient sam, do limitu planu).
 
--- zapamietaj id:
-SELECT id FROM tenants WHERE slug = 'znajomy';
-
--- wersja bota (aktywna)
--- ... (na razie najprościej: użyj Default Tenant do testu, patrz niżej)
-\q
-```
-
-> **Prościej na pierwszy test:** użyj istniejącego Default Tenant. Zaloguj się jako
-> `owner@demo.local`, wgraj dokumenty przez panel, ustaw allowed_origins na domenę
-> znajomego, skopiuj jego embed z zakładki Widget.
+> **Prościej na pierwszy test:** użyj istniejącego Default Tenant — zaloguj się `owner@demo.local`,
+> wgraj dokumenty, ustaw allowed_origins (krok 10), skopiuj embed z zakładki Widget.
+>
+> Provisioning robi to samo przez API: `POST /api/super-admin/organizations`
+> `{name, ownerEmail, plan, firstBotName}` (jako super admin).
 
 ## 10. Ogranicz widget do domeny znajomego
 

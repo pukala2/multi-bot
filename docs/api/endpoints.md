@@ -1,6 +1,12 @@
 # REST API - przegląd i konwencje
 
-Strategia API-first: **`openapi.yaml` jest single source of truth**. Z niego generujemy DTOs i API interfaces w buildzie.
+> **Aktualizacja (po Fazach A–D + pivot Organizacja→Boty):** auth/billing/super-admin/bots są już zaimplementowane.
+> Uwierzytelnianie to **sesje (cookie) + CSRF**, nie JWT (patrz sekcja 10). Endpointy `documents`, `chat`,
+> `admin/widget`, `admin/versions`, `admin/rag-settings`, `admin/analytics`, `admin/stats`, `widget/config`
+> są **generowane z `openapi.yaml`** (kontrolery implementują interfejsy). Endpointy `auth`, `bots`,
+> `super-admin`, `admin/billing`, `widget/turnstile` to **ręczne kontrolery** (poza `openapi.yaml`).
+
+Strategia API-first: **`openapi.yaml` jest single source of truth** dla części generowanej. Z niego generujemy DTOs i API interfaces w buildzie.
 
 Ten dokument:
 - Strategia i workflow API-first
@@ -152,8 +158,9 @@ DTO będą jako **klasy** (nie records) domyślnie w spring generator - records 
 | ID w ścieżce, nie w query string | `/api/documents/{id}` (NIE `/api/documents?id=42`) |
 | Akcje jako sub-path tylko gdy konieczne | `/api/documents/{id}/retry-indexing` (post-MVP) |
 | Prefiks `/api/` dla całego REST API | wszystko |
-| `/api/admin/*` dla operacji wymagających roli admin | `/api/admin/tenants`, `/api/admin/stats` |
-| `/api/widget/*` dla publicznych endpointów widgetu | `/api/widget/sessions` |
+| `/api/admin/*` dla operacji zalogowanego admina klienta (per aktywny bot) | `/api/admin/billing/usage`, `/api/admin/stats` |
+| `/api/super-admin/*` dla operacji platformy (rola SUPER_ADMIN) | `/api/super-admin/organizations` |
+| `/api/widget/*` dla publicznych endpointów widgetu | `/api/widget/config`, `/api/widget/turnstile` |
 
 ### HTTP Methods
 
@@ -179,7 +186,8 @@ W MVP używamy głównie GET/POST/DELETE. PATCH dorzucamy gdy będzie potrzeba u
 | **401 Unauthorized** | Brak / nieprawidłowy token (post-MVP) |
 | **403 Forbidden** | Token OK, ale brak uprawnień do zasobu (cross-tenant access) |
 | **404 Not Found** | Zasób nie istnieje (lub należy do innego tenanta - patrz uwaga niżej) |
-| **409 Conflict** | Konflikt biznesowy (np. duplicate slug) |
+| **402 Payment Required** | Limit wiadomości organizacji przekroczony (czat) — `MESSAGE_LIMIT_REACHED` |
+| **409 Conflict** | Konflikt biznesowy (duplicate email, limit liczby botów planu przekroczony) |
 | **413 Payload Too Large** | Plik większy niż 50MB |
 | **500 Internal Server Error** | Bug serwera, exception nieprzewidziany |
 
@@ -315,9 +323,40 @@ responses:
 
 ---
 
-## 8. Lista endpointów MVP
+## 8. Lista endpointów
 
-### Documents
+### Auth + sesja (ręczny kontroler, poza openapi.yaml)
+
+| Method | Path | Dostęp | Notatki |
+|--------|------|--------|---------|
+| `POST` | `/api/auth/login` | publiczny | email+hasło → ustawia sesję; zwraca usera + `organizationId` + `activeBot` + `bots[]` |
+| `POST` | `/api/auth/logout` | publiczny | czyści sesję (204) |
+| `GET` | `/api/auth/me` | zalogowany | user + organizacja + aktywny bot + lista botów |
+| `POST` | `/api/auth/active-bot` | OWNER/ADMIN | `{tenantId}` — przełącza aktywnego bota (waliduje że bot należy do org usera; obcy → 403) |
+
+### Self-serve boty (ręczny kontroler) — rola OWNER
+
+| Method | Path | Sukces | Notatki |
+|--------|------|--------|---------|
+| `GET` | `/api/bots/limit` | 200 | `{allowed, currentBots, maxBots, unlimited}` dla org usera |
+| `POST` | `/api/bots` | 201 | tworzy bota w org usera; egzekwuje `max_bots` planu (409 + upsell po limicie) |
+
+### Super admin (ręczny kontroler) — rola SUPER_ADMIN
+
+| Method | Path | Sukces | Notatki |
+|--------|------|--------|---------|
+| `GET` | `/api/super-admin/organizations` | 200 | lista organizacji + ich boty + wspólne zużycie + limit |
+| `POST` | `/api/super-admin/organizations` | 201 | provisioning: organizacja + owner (auto-hasło) + pierwszy bot; hasło/klucz pokazane RAZ |
+| `POST` | `/api/super-admin/organizations/{orgId}/bots` | 201 | dodaje bota do organizacji (bez limitu planu) |
+
+### Billing — admin klienta (ręczny kontroler)
+
+| Method | Path | Sukces | Notatki |
+|--------|------|--------|---------|
+| `GET` | `/api/admin/billing/usage` | 200 | zużycie wiadomości (pooled = suma botów org) vs limit; bez tokenów/kosztów |
+| `GET` | `/api/admin/billing/plan` | 200 | plan organizacji + cechy (max_bots, custom domain, API access) |
+
+### Documents (generowane z openapi.yaml)
 
 | Method | Path | Tag | Use case | Sukces | Notatki |
 |--------|------|-----|----------|--------|---------|
@@ -334,15 +373,31 @@ responses:
 | `POST` | `/api/chat/sessions` | Chat | `StartSessionUseCase` | 201 | + `Location: /api/chat/sessions/{id}` |
 | `GET` | `/api/chat/sessions` | Chat | `ListSessionsUseCase` | 200 | paginacja, sort default `lastActivityAt,desc` |
 | `GET` | `/api/chat/sessions/{id}/messages` | Chat | `GetSessionHistoryUseCase` | 200 | paginacja, sort default `createdAt,asc` |
-| `POST` | `/api/chat/sessions/{id}/messages` | Chat | `SendMessageUseCase` | 200 | **SSE stream** - patrz sekcja 10 |
+| `POST` | `/api/chat/sessions/{id}/messages` | Chat | `SendMessageUseCase` | 200 | SSE stream lub JSON; **402** gdy limit org przekroczony |
 
-### Health (Spring Boot)
+### Admin — panel klienta, per aktywny bot (generowane z openapi.yaml)
+
+| Method | Path | Sukces | Notatki |
+|--------|------|--------|---------|
+| `GET` / `PUT` | `/api/admin/widget` | 200 | konfiguracja widgetu aktywnego bota (kolor, tytuł, powitanie…) |
+| `GET` | `/api/admin/versions` + `/active` | 200 | wersje bota; `POST /api/admin/versions`, `POST /{id}/activate`, `DELETE /{id}` |
+| `GET` / `PUT` | `/api/admin/rag-settings` | 200 | ustawienia RAG aktywnego bota |
+| `GET` | `/api/admin/analytics` | 200 | analityka bota (tokeny/koszty tylko dla super admina) |
+| `GET` | `/api/admin/stats` | 200 | KPI dashboardu (wymaga aktywnego bota → SUPER_ADMIN 500/ukryte w UI) |
+
+### Widget — publiczny (osadzony na stronie klienta)
+
+| Method | Path | Dostęp | Notatki |
+|--------|------|--------|---------|
+| `GET` | `/api/widget/config` | publiczny (`?key=`) | konfiguracja widgetu po kluczu publicznym |
+| `GET` | `/api/widget/turnstile` | publiczny | `{enabled, siteKey}` dla anty-bota (ręczny kontroler) |
+
+### Health / docs (Spring Boot)
 
 | Method | Path | Notatki |
 |--------|------|---------|
-| `GET` | `/actuator/health` | Spring Boot built-in, NIE w yaml |
-| `GET` | `/swagger-ui.html` | SpringDoc, NIE w yaml |
-| `GET` | `/v3/api-docs` | SpringDoc, generuje yaml runtime |
+| `GET` | `/actuator/health` + `/health/**` | publiczny (liveness/readiness dla probe'ów) |
+| `GET` | `/swagger-ui.html`, `/v3/api-docs` | SpringDoc (tylko dev) |
 
 ---
 
@@ -379,29 +434,18 @@ W praktyce dla MVP - opisujemy w description, schemy konkretnych event payloadó
 
 ---
 
-## 10. Authentication (post-MVP)
+## 10. Uwierzytelnianie — sesje (cookie) + CSRF
 
-W MVP - brak auth. Endpointy otwarte, `tenant_id` hardcoded na default.
+**NIE JWT.** Spring Security 6.4 + Spring Session JDBC (sesje w Postgres, przeżywają restart). Panel admina jest same-origin, więc sesja w cookie (HttpOnly, SameSite=Lax) jest prostsza i bezpieczniejsza niż JWT (natychmiastowy logout, brak refresh-token).
 
-Post-MVP - JWT Bearer:
+- **Logowanie:** `POST /api/auth/login` (email+hasło) → cookie sesji `SESSION`.
+- **CSRF:** mutacje wymagają nagłówka `X-XSRF-TOKEN` zgodnego z cookie `XSRF-TOKEN` (double-submit, `CookieCsrfTokenRepository`). Frontend dokleja go automatycznie. CSRF-exempt: `/api/widget/**`, `/api/chat/**`, `/actuator/**`.
+- **Role:** `SUPER_ADMIN` (platforma, bez organizacji), `OWNER`, `ADMIN` (per organizacja).
+- **Autoryzacja ścieżek:** `/api/super-admin/**` → `SUPER_ADMIN`; `/api/bots/**` → `OWNER`; `/api/auth/login|logout`, `/api/widget/**`, `POST /api/chat/sessions[/…/messages]`, `/actuator/health/**`, `/actuator/info` → publiczne; reszta → zalogowany.
+- **Tenant/aktywny bot:** rozwiązywany z sesji (patrz [`../architecture/multi-tenancy.md`](../architecture/multi-tenancy.md) sekcja 3), nie z tokenu.
+- **Widget (anonim):** osobny mechanizm — `X-Multibot-Widget-Key` + Origin + rate-limit + Turnstile (`WidgetGuardFilter`), nie sesja.
 
-```yaml
-components:
-  securitySchemes:
-    BearerAuth:
-      type: http
-      scheme: bearer
-      bearerFormat: JWT
-
-security:
-  - BearerAuth: []
-```
-
-Wyjątki bez auth:
-- `POST /api/auth/login`
-- `POST /api/auth/register`
-- `/api/widget/*` (osobny scheme: `X-Widget-Key` header)
-- `/actuator/health`
+> Endpointy auth/bots/super-admin/billing są ręcznymi kontrolerami i nie figurują w `openapi.yaml`.
 
 ---
 

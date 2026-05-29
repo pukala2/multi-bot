@@ -1,5 +1,9 @@
 # Flow: Upload + indeksacja dokumentu
 
+> **Aktualizacja:** mechanika bez zmian. Terminologia: `tenant` = **bot** (granica izolacji). Dokumenty wgrywa
+> zalogowany owner/admin dla **aktywnego bota** (`tenant_id` z sesji). Super admin nie wgrywa dokumentów
+> (brak aktywnego bota — robi to klient lub, docelowo, przez impersonację).
+
 Pełen flow od kliknięcia "Upload" przez Admina aż do chunków zaindeksowanych w pgvector i statusu `READY` w bazie.
 
 **Diagram:** [`../diagrams/document-upload-flow.puml`](../diagrams/document-upload-flow.puml)

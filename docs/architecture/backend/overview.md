@@ -1,5 +1,9 @@
 # Backend - widok ogólny
 
+> **Aktualizacja (Fazy A–D + pivot):** doszły moduły `organization`, `auth`, `billing`, `security`,
+> `superadmin`, `bots`, `widget`, `botversion`. Aktualna lista modułów + ich rola →
+> [`modules-business.md`](modules-business.md); model Organizacja→Boty → [`../multi-tenancy.md`](../multi-tenancy.md).
+
 Filozofia organizacji kodu backendu, drzewo pakietów, kluczowe decyzje techniczne.
 
 Szczegóły:

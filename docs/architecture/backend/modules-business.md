@@ -2,16 +2,35 @@
 
 Moduły **mające domenę biznesową**. Każdy zgodny z wzorcem hexagonalnym z [`hexagonal-pattern.md`](hexagonal-pattern.md).
 
-Dwie podgrupy:
+> **Aktualizacja (Fazy A–D + pivot):** doszły moduły `organization`, `auth`, `billing`, `security`, `superadmin`, `bots`
+> oraz `widget`/`botversion`. `tenant/` znaczy teraz **bot** (granica izolacji), a `user/` zastąpił realny moduł
+> `auth/`. Granice modułów (`allowedDependencies`) są w `package-info.java` każdego modułu (weryfikowane testem
+> `ApplicationModulesTest`).
+
+### Nowe moduły (Fazy A–D)
+
+| Moduł | Rola | Kluczowe (źródło prawdy: kod) |
+|-------|------|-------------------------------|
+| `organization/` | klient platformy (konto) ponad botami | `Organization` (plan, override-y, dane firmy), Create/Get/List use cases |
+| `auth/` | logowanie, użytkownicy, sesje, security config | `User` (`organizationId`, role SUPER_ADMIN/OWNER/ADMIN), `AuthController` (/login,/logout,/me,/active-bot), `SecurityConfig`, `AuthenticatedTenantResolver`, bootstrap |
+| `billing/` | plany, zużycie, limity (wiadomości pooled + liczba botów) | `BillingService` (Check/Increment/GetUsage, CheckBotLimit), repo planów/usage |
+| `security/` | tarcza widgetu (anonim) | `WidgetGuardFilter` (key+origin+rate-limit), `RateLimiterService`, `TurnstileVerifier` |
+| `superadmin/` | provisioning klientów (rola SUPER_ADMIN) | `ProvisionOrganizationService` (org+owner+1. bot), `SuperAdminController` (/organizations, /{id}/bots) |
+| `bots/` | provisioning bota + self-serve ownera | `BotProvisioningService` (`AddBotUseCase`), `OwnerBotService` (limit per plan), `BotController` (/api/bots) |
+| `widget/`, `botversion/` | konfiguracja+klucz widgetu; wersjonowanie bota (deep-copy) | per-tenant (`@TenantId`) |
+
+Poniższe sekcje opisują **pierwotny MVP**; gdzie różni się od stanu obecnego — patrz [`../multi-tenancy.md`](../multi-tenancy.md) i kod.
+
+Dwie podgrupy (pierwotny podział MVP):
 
 | Podgrupa | Charakterystyka | Lista modułów |
 |----------|-----------------|---------------|
-| **Business** | Mają domenę + wystawiają REST API | `tenant`, `user`, `document`, `chat` |
+| **Business** | Mają domenę + wystawiają REST API | `tenant`, `document`, `chat` |
 | **Orchestrator** | Mają domenę, ale brak REST API - wołane przez inne moduły lub eventy | `file`, `vector`, `indexing`, `rag` |
 
-Spis modułów:
-- [`tenant/`](#tenant) - zarządzanie tenantami
-- [`user/`](#user) - userzy panelu (post-MVP)
+Spis modułów (MVP):
+- [`tenant/`](#tenant) - = **bot** (granica izolacji; ma `organization_id`)
+- [`user/`](#user) - ⚠️ zastąpiony realnym modułem `auth/` (patrz tabela wyżej)
 - [`file/`](#file) - storage plików
 - [`vector/`](#vector) - pgvector + tenant filter
 - [`document/`](#document) - dokumenty

@@ -2,6 +2,11 @@
 
 Tabele, relacje, indeksy, klucze obce. Migracje Flyway organizowane per moduł.
 
+> **Aktualizacja (Fazy A–D + pivot Organizacja→Boty):** schemat urósł o auth, billing, security, super admina,
+> organizacje i widget. **Migracje Flyway są źródłem prawdy** (`src/main/resources/db/migration/<moduł>/`).
+> Kluczowa zmiana: `organizations` (klient) stoi ponad `tenants` (= bot); plan/limity/dane firmowe są na
+> organizacji; `users.organization_id` zamiast `tenant_id`. Pełny model: [`../architecture/multi-tenancy.md`](../architecture/multi-tenancy.md).
+
 Szczegóły pgvector (vector store, indeksy wektorowe, similarity search) → [`pgvector.md`](pgvector.md).
 
 ---
@@ -160,59 +165,83 @@ W skrócie:
 
 ## 6. Tabele per moduł
 
-### `tenants` (moduł `tenant/`)
+### `organizations` (moduł `organization/`) — klient platformy
+
+```sql
+CREATE TABLE organizations (
+    id                              UUID PRIMARY KEY,
+    name                            VARCHAR(255) NOT NULL,
+    slug                            VARCHAR(64)  NOT NULL UNIQUE,
+    plan                            VARCHAR(32)  NOT NULL DEFAULT 'FREE',  -- FK billing_plans(code)
+    status                          VARCHAR(32)  NOT NULL DEFAULT 'ACTIVE',
+    company_name                    VARCHAR(255),                          -- dane do faktur
+    nip                             VARCHAR(20),
+    monthly_messages_limit_override INTEGER,                               -- NULL = z planu
+    max_bots_override               INTEGER,                               -- NULL = z planu (Enterprise = negocjowane)
+    created_at / updated_at         TIMESTAMPTZ NOT NULL
+);
+```
+Plan, limit wiadomości (wspólny dla wszystkich botów), limit liczby botów i dane firmowe są na poziomie **organizacji**.
+
+### `tenants` (moduł `tenant/`) — = BOT (granica izolacji danych)
 
 ```sql
 CREATE TABLE tenants (
-    id            UUID         PRIMARY KEY,
-    name          VARCHAR(255) NOT NULL,
-    slug          VARCHAR(64)  NOT NULL,
-    plan          VARCHAR(32)  NOT NULL DEFAULT 'FREE',
-    status        VARCHAR(32)  NOT NULL DEFAULT 'ACTIVE',
-    created_at    TIMESTAMPTZ  NOT NULL,
-    updated_at    TIMESTAMPTZ  NOT NULL,
-    created_by    UUID,
-    updated_by    UUID,
-
-    CONSTRAINT uq_tenants_slug UNIQUE (slug),
-    CONSTRAINT ck_tenants_plan CHECK (plan IN ('FREE', 'BASIC', 'PRO')),
-    CONSTRAINT ck_tenants_status CHECK (status IN ('ACTIVE', 'SUSPENDED'))
+    id              UUID         PRIMARY KEY,
+    name            VARCHAR(255) NOT NULL,
+    slug            VARCHAR(64)  NOT NULL UNIQUE,
+    organization_id UUID         NOT NULL REFERENCES organizations(id) ON DELETE CASCADE,
+    status          VARCHAR(32)  NOT NULL DEFAULT 'ACTIVE',
+    created_at / updated_at / created_by / updated_by
 );
-
-CREATE INDEX idx_tenants_status ON tenants(status);
+CREATE INDEX idx_tenants_organization ON tenants(organization_id);
 ```
 
-**Notatki:**
-- `slug` - URL-friendly identifier (`acme-corp`, `default`). Unique globally.
-- CHECK constraints na `plan` i `status` - zamiast osobnych tabel enum
-- Brak `tenant_id` (sama jest tenantem)
+**Notatki (po pivocie Organizacja→Boty):**
+- `tenants` = **bot**; `tenant_id` w pozostałych tabelach to id bota.
+- `plan`, `company_name`, `nip`, override-y **przeniesione do `organizations`** (usunięte z `tenants`).
+- Plany (`billing_plans.code`): `FREE` / `BASIC` / `PRO` / `ENTERPRISE`.
 
-### `users` (moduł `user/` - post-MVP)
+### `users` (moduł `auth/`)
 
 ```sql
 CREATE TABLE users (
-    id             UUID          PRIMARY KEY,
-    tenant_id      UUID          NOT NULL,
-    email          VARCHAR(320)  NOT NULL,
-    password_hash  VARCHAR(255)  NOT NULL,
-    role           VARCHAR(32)   NOT NULL,
-    created_at     TIMESTAMPTZ   NOT NULL,
-    updated_at     TIMESTAMPTZ   NOT NULL,
-    created_by     UUID,
-    updated_by     UUID,
+    id              UUID          PRIMARY KEY,
+    email           VARCHAR(255)  NOT NULL UNIQUE,   -- login, globalnie unikalny
+    password_hash   VARCHAR(255)  NOT NULL,          -- BCrypt
+    role            VARCHAR(32)   NOT NULL,          -- SUPER_ADMIN | OWNER | ADMIN
+    status          VARCHAR(32)   NOT NULL DEFAULT 'ACTIVE',  -- ACTIVE | DISABLED | MUST_CHANGE_PASSWORD
+    organization_id UUID,                            -- NULL dla SUPER_ADMIN; FK organizations
+    created_by      UUID,
+    created_at / updated_at / last_login_at,
 
-    CONSTRAINT fk_users_tenants FOREIGN KEY (tenant_id) REFERENCES tenants(id) ON DELETE RESTRICT,
-    CONSTRAINT uq_users_tenant_email UNIQUE (tenant_id, email),
-    CONSTRAINT ck_users_role CHECK (role IN ('ADMIN', 'MEMBER'))
+    CONSTRAINT ck_users_org_for_role CHECK (
+        (role = 'SUPER_ADMIN' AND organization_id IS NULL) OR
+        (role IN ('OWNER','ADMIN') AND organization_id IS NOT NULL))
 );
-
-CREATE INDEX idx_users_tenant ON users(tenant_id);
+CREATE UNIQUE INDEX idx_users_one_owner_per_org ON users(organization_id) WHERE role = 'OWNER';
 ```
 
 **Notatki:**
-- Email unique **per tenant** - dwie firmy mogą mieć tych samych adminów z tym samym mailem (rzadkie, ale technicznie OK)
-- VARCHAR(320) - max długość emaila per RFC 5321 (64 local + 1 @ + 255 domain)
-- Tabela istnieje w schemacie od początku (Flyway), ale w MVP pusta i brak endpointów
+- User należy do **organizacji** (nie do pojedynczego bota) → zarządza wszystkimi botami org.
+- `SUPER_ADMIN` jest ponad organizacjami (`organization_id` NULL).
+- Email **globalnie unikalny** (jeden login = jedno konto).
+
+### Pozostałe tabele dodane w Fazach A–D (skrót — DDL w migracjach)
+
+| Tabela | Moduł / migracja | Po co | Kluczowe kolumny |
+|--------|------------------|-------|------------------|
+| `billing_plans` | billing | definicje planów (edytowalne w DB) | `code` PK, `monthly_messages_limit` (-1=∞), `max_bots`, `custom_domain_allowed`, `api_access_allowed`, `price_pln_monthly` |
+| `tenant_usage` | billing | licznik zużycia **per bot** per miesiąc | PK `(tenant_id, period_month)`, `user_messages`, `ai_messages`, `tokens_used`, `cost_usd` |
+| `audit_log` | auth | log zdarzeń bezpieczeństwa | — |
+| `spring_session` / `spring_session_attributes` | auth | sesje Spring Session JDBC (cookie auth) | — |
+| `widget_settings` | widget | konfiguracja widgetu bota (`@TenantId`) | kolor, tytuł, powitanie, isActive |
+| `widget_keys` | widget | klucze publiczne widgetu + `allowed_origins TEXT[]` | `key`, `is_active`, `allowed_origins` |
+| `chatbot_versions` | botversion (document) | wersjonowanie bota (deep-copy) | `status` DRAFT/ACTIVE |
+| `chatbot_active_version` | botversion | aktywna wersja per bot | PK `tenant_id` |
+| `tenant_rag_settings` | rag | parametry RAG per bot (`@TenantId`) | top-k, próg podobieństwa, model |
+
+Limit wiadomości jest **pooled** na organizację: sprawdzany jako suma `tenant_usage.user_messages` wszystkich botów org vs limit planu (override z `organizations`).
 
 ### `stored_files` (moduł `file/`)
 
