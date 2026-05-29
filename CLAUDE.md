@@ -92,6 +92,14 @@ Endpointy spoza CRUD-owego rdzenia (warte zapamiętania):
 
 Role/ścieżki (SecurityConfig): `/api/super-admin/**` → SUPER_ADMIN; `/api/bots/**` → OWNER; login/logout, `/api/widget/**`, `POST /api/chat/sessions[/...]`, `/actuator/health/**`, `/actuator/info` → publiczne; reszta → zalogowany. Limit wiadomości przekroczony → **402**; limit botów → **409**.
 
+Bezpieczeństwo (SecurityConfig + filtry, hardening 2026-05-29):
+- **CORS dwupolityczny:** panel `/api/**` z cookie → tylko originy z `multibot.cors.allowed-origins` (`MULTIBOT_CORS_ALLOWED_ORIGINS`, prod = domena panelu); widget/chat → `*` ale BEZ credentials (autoryzacja kluczem widgetu). NIE wracaj do `allowedOriginPatterns("*")` z `allowCredentials(true)`.
+- **Throttling logowania:** `LoginRateLimitFilter` per IP (Bucket4j), `MULTIBOT_LOGIN_MAX_PER_MIN` (domyślnie 10) → **429**. W profilu `test` praktycznie wyłączony (`application-test.yml`), żeby nie psuć ITów.
+- **Session fixation:** `AuthController.login` woła `httpRequest.changeSessionId()` po uwierzytelnieniu.
+- **Cookie (prod):** Secure+SameSite=Lax+HttpOnly; `server.forward-headers-strategy=framework` (Caddy ustawia X-Forwarded-* → `request.isSecure()` za proxy → secure cookies + HSTS).
+- **Nagłówki:** HSTS/CSP/Referrer-Policy w Spring Security (API/Swagger) ORAZ CSP/HSTS/nosniff/Referrer/X-Frame=DENY w `deploy/Caddyfile` (SPA). CSP panelu = `script-src 'self'` — build Vite nie ma inline scriptów, więc nie dodawaj `'unsafe-inline'` do script-src bez potrzeby.
+- 401 logowania = `BadCredentialsException` → ProblemDetail (GlobalExceptionHandler).
+
 ---
 
 ## 5. Lokalny development
@@ -150,7 +158,8 @@ Stan na teraz: `mvn verify` zielony (67 unit + 44 IT), `npm test` zielony (32), 
 | Katalog | `/opt/multibot` (git clone repo) |
 | Domena | `https://multibot-test.duckdns.org` (DuckDNS) |
 | Kontenery | `multibot-postgres`, `multibot-backend` (wewnętrzny, NIE wystawiony na host), `multibot-web` (Caddy, 80/443, auto-HTTPS) |
-| Sekrety prod | `deploy/.env` na serwerze (gitignored): DOMAIN, DB_PASSWORD, klucze API, MULTIBOT_SUPERADMIN_*, MULTIBOT_TURNSTILE_* |
+| Sekrety prod | `deploy/.env` na serwerze (gitignored): DOMAIN, DB_PASSWORD, klucze API, MULTIBOT_SUPERADMIN_*, MULTIBOT_DEMO_OWNER_*, MULTIBOT_TURNSTILE_* |
+| Konfig opcj. | `MULTIBOT_CORS_ALLOWED_ORIGINS` (originy panelu; prod domyślnie domena duckdns — **zmień przy zmianie domeny**), `MULTIBOT_LOGIN_MAX_PER_MIN` (throttling logowania, dom. 10) |
 
 ### Połączenie
 ```bash
@@ -214,14 +223,15 @@ Domeny widgetu (`allowed_origins`): owner ustawia na stronie Widget („Dozwolon
 
 ## 10. Stan i backlog (na czas pisania)
 
-**Zrobione i na prodzie:** pivot Organizacja→Boty, auth (sesje), billing pooled + max_bots, super admin (org+boty), self-serve dodawania botów, przełącznik botów, dozwolone domeny widgetu (klocki) + URL przy dodawaniu bota, `mvn verify` zielony, dokumentacja tekstowa zaktualizowana.
+**Zrobione i na prodzie:** pivot Organizacja→Boty, auth (sesje), billing pooled + max_bots, super admin (org+boty), self-serve dodawania botów, przełącznik botów, dozwolone domeny widgetu (klocki) + URL przy dodawaniu bota, `mvn verify` zielony, dokumentacja tekstowa zaktualizowana, **testy frontendu (Vitest)**, **API contract-first (openapi domknięty)**, **hardening bezpieczeństwa (CORS allowlist, throttling logowania, session fixation, nagłówki/CSP, cookie Secure)** — patrz §4.
 
 **Backlog / niezrobione:**
-- Impersonacja: super admin „wejdź jako klient" (resolver ma już gałąź `impersonatedTenantId`, brak endpointu/UI).
+- Impersonacja: super admin „wejdź jako klient" — do zrobienia od zera (martwa gałąź w resolverze USUNIĘTA dla bezpieczeństwa; dodać razem z endpointem + guardem SUPER_ADMIN + audytem).
 - Użytkownicy w organizacji: OWNER zaprasza ADMINów, wymuszona zmiana hasła (status `MUST_CHANGE_PASSWORD` istnieje).
 - Turnstile: realne klucze + włączenie (`MULTIBOT_TURNSTILE_*` w prod .env), gdy domena w Cloudflare.
 - Diagramy `docs/diagrams/*.puml` — nieaktualne (stary model tenant=Long/JWT) — do uzupełnienia. (openapi.yaml domknięty: zawiera już wszystkie endpointy, w tym auth/bots/super-admin/billing/widget-origins/turnstile.)
 - Alerty mailowe 80%/100% limitu, dedup plików po hashu, RODO, samodzielna rejestracja, płatności.
+- **Bezpieczeństwo/ops (niezrobione):** backupy DB szyfrowane + offsite + cron + retencja (dziś jawny `pg_dump` na hoście); CI (GitHub Actions jako bramka testów — dziś build leci na prodzie); skanowanie zależności (Dependabot/OWASP); rate limiter na Redis (dziś in-memory, nie przetrwa restartu/skalowania); N+1 w `SuperAdminController.listOrganizations` (per org + per bot zapytania); brute-force lockout per-konto (dziś tylko throttling per IP).
 
 ---
 
