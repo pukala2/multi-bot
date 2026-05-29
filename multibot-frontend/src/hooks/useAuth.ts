@@ -90,8 +90,10 @@ export function useSwitchActiveBot() {
     onSuccess: (bot) => {
       qc.setQueryData(ME_KEY, (old: CurrentUser | null | undefined) =>
         old ? { ...old, activeBot: bot } : old);
-      // Aktywny bot zmienia tenant -> przeładuj wszystkie dane tenant-scoped (panel, sesje, analityka, ...)
-      qc.invalidateQueries();
+      // Aktywny bot zmienia tenant -> USUŃ cały cache danych poprzedniego bota (oprócz /me).
+      // removeQueries (nie invalidate), żeby strony nie inicjalizowały formularzy ze stale danych
+      // poprzedniego bota podczas refetchu (np. ustawienia widgetu zapisywane do złego bota).
+      qc.removeQueries({ predicate: (q) => q.queryKey[0] !== 'auth' });
     },
   });
 }
