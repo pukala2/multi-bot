@@ -5,6 +5,9 @@ import { UploadZone } from '@/components/domain/UploadZone';
 import { DocumentsTable } from '@/components/domain/DocumentsTable';
 import { PaginationFooter } from '@/components/domain/PaginationFooter';
 import { useDocuments } from '@/hooks/useDocuments';
+import { plPlural } from '@/lib/format';
+
+const DOKUMENT_FORMS: [string, string, string] = ['dokument', 'dokumenty', 'dokumentów'];
 
 export function DocumentsPage() {
   const [page, setPage] = useState(0);
@@ -27,7 +30,7 @@ export function DocumentsPage() {
             <div>
               <CardTitle>Lista dokumentów</CardTitle>
               <CardSubtitle>
-                {data?.pagination?.totalElements ?? '—'} {(data?.pagination?.totalElements ?? 0) === 1 ? 'dokument' : 'dokumentów'} w bazie
+                {data?.pagination?.totalElements ?? '—'} {plPlural(data?.pagination?.totalElements ?? 0, DOKUMENT_FORMS)} w bazie
               </CardSubtitle>
             </div>
           </CardHeader>

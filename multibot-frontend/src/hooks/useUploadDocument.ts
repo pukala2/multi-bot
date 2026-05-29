@@ -1,4 +1,5 @@
 import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { readCookie } from '@/api/client';
 import { ApiError, type ProblemDetail } from '@/api/errors';
 import type { components } from '@/api/schema';
 
@@ -24,6 +25,10 @@ function uploadWithProgress(
       ? `/api/documents?versionId=${encodeURIComponent(versionId)}`
       : '/api/documents';
     xhr.open('POST', url);
+    xhr.withCredentials = true;
+    // CSRF: raw XHR pomija middleware api clienta — token trzeba dodać ręcznie, inaczej 403.
+    const csrf = readCookie('XSRF-TOKEN');
+    if (csrf) xhr.setRequestHeader('X-XSRF-TOKEN', csrf);
 
     xhr.upload.addEventListener('progress', (e) => {
       if (!e.lengthComputable || !onProgress) return;

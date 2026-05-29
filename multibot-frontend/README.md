@@ -1,6 +1,7 @@
 # Multibot Frontend
 
-Admin panel dla Multibota — zarządzanie dokumentami, czat playground, sesje, ustawienia.
+Admin panel dla Multibota — logowanie (sesja+CSRF), zarządzanie botami (Organizacja→Boty, przełącznik
+aktywnego bota), dokumenty, czat playground, sesje, plan i limity, panel super admina (klienci).
 
 ## Stack
 
@@ -82,11 +83,11 @@ npm run build
 # Output: dist/ (statyczne pliki do nginx/CDN)
 ```
 
-## Status fazy
+## Status
 
-- ✅ **F1** — Foundation (Vite + React + TS + Tailwind + shadcn-style + routing + app shell)
-- ⏳ **F2** — OpenAPI codegen (gen:api script gotowy, pierwsze typed hooks)
-- ⏳ **F3** — Documents module
-- ⏳ **F4** — Chat playground (SSE)
-- ⏳ **F5** — Sessions history
-- ⏳ **F6** — Dashboard + polish
+Zaimplementowane: dashboard, dokumenty, czat (SSE), sesje, ustawienia bota, widget, plan i limity,
+logowanie + `ProtectedRoute`, przełącznik aktywnego bota (≥2 boty), panel super admina (organizacje + boty),
+self-serve „Dodaj bota" (limit per plan). Auth przez sesję (cookie) + CSRF; super admin widzi tylko „Klienci".
+
+> Część endpointów (auth, bots, super-admin, billing) to ręczne kontrolery poza `openapi.yaml`, więc
+> `gen:api` ich nie obejmuje — te wołane są ręcznym `fetch` z `credentials: 'same-origin'` + `X-XSRF-TOKEN`.

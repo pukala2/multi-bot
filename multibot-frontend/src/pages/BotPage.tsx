@@ -18,11 +18,13 @@ import {
   useDeleteVersion,
 } from '@/hooks/useVersions';
 import { showApiError } from '@/api/errors';
-import { timeAgo } from '@/lib/format';
+import { timeAgo, plPlural } from '@/lib/format';
 import { cn } from '@/lib/cn';
 import type { components } from '@/api/schema';
 
 type VersionStatus = components['schemas']['ChatbotVersionResponse']['status'];
+
+const DOKUMENT_FORMS: [string, string, string] = ['dokument', 'dokumenty', 'dokumentów'];
 
 function statusVariant(status: VersionStatus): 'success' | 'warning' | 'neutral' {
   if (status === 'ACTIVE') return 'success';
@@ -48,7 +50,11 @@ export function BotPage() {
   const [copyFrom, setCopyFrom] = useState<string>('');
 
   useEffect(() => {
-    if (versions.data && versions.data.length > 0 && !selectedVersionId) {
+    if (!versions.data || versions.data.length === 0) return;
+    // Auto-wybór gdy nic nie wybrano LUB gdy wybrana wersja już nie istnieje
+    // (np. po przełączeniu bota selectedVersionId wskazywałby wersję innego bota).
+    const stillExists = selectedVersionId && versions.data.some((v) => v.id === selectedVersionId);
+    if (!stillExists) {
       const active = versions.data.find((v) => v.status === 'ACTIVE');
       setSelectedVersionId(active?.id ?? versions.data[0].id);
     }
@@ -204,7 +210,7 @@ export function BotPage() {
               <div>
                 <CardTitle>Lista dokumentów</CardTitle>
                 <CardSubtitle>
-                  {versionDocs.data?.pagination?.totalElements ?? '—'} dokumentów w tej wersji
+                  {versionDocs.data?.pagination?.totalElements ?? '—'} {plPlural(versionDocs.data?.pagination?.totalElements ?? 0, DOKUMENT_FORMS)} w tej wersji
                 </CardSubtitle>
               </div>
             </CardHeader>

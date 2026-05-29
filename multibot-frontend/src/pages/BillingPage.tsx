@@ -1,7 +1,12 @@
+import { useState } from 'react';
+import { Plus } from 'lucide-react';
 import { Topbar } from '@/components/layout/Topbar';
 import { Card, CardBody, CardHeader, CardTitle, CardSubtitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { AddBotDialog } from '@/components/bots/AddBotDialog';
 import { useBillingUsage, useBillingPlan } from '@/hooks/useBilling';
+import { useBotLimit } from '@/hooks/useBots';
 import { useAuth } from '@/hooks/useAuth';
 import { cn } from '@/lib/cn';
 
@@ -13,6 +18,9 @@ export function BillingPage() {
   const auth = useAuth();
   const usage = useBillingUsage();
   const plan = useBillingPlan();
+  const isOwner = auth.data?.role === 'OWNER';
+  const botLimit = useBotLimit(isOwner);
+  const [addBotOpen, setAddBotOpen] = useState(false);
 
   // Super admin nie ma tenanta = nie ma planu. Cross-tenant overview pojawi sie w Fazie D.
   if (auth.data?.role === 'SUPER_ADMIN') {
@@ -96,6 +104,41 @@ export function BillingPage() {
         </CardBody>
       </Card>
 
+      {/* Boty (self-serve dodawanie) */}
+      {isOwner && botLimit.data && (
+        <Card className="mb-4">
+          <CardHeader>
+            <div className="flex items-center justify-between w-full gap-3">
+              <div>
+                <CardTitle>Boty (strony)</CardTitle>
+                <CardSubtitle>Każda strona to osobny bot. Limit wiadomości jest wspólny dla wszystkich.</CardSubtitle>
+              </div>
+              <Button
+                size="sm"
+                disabled={!botLimit.data.allowed}
+                onClick={() => setAddBotOpen(true)}
+                title={botLimit.data.allowed ? 'Dodaj bota' : 'Limit planu osiągnięty'}
+              >
+                <Plus className="size-3.5" /> Dodaj bota
+              </Button>
+            </div>
+          </CardHeader>
+          <CardBody>
+            <div className="text-[14px]">
+              <span className="text-[22px] font-semibold">{botLimit.data.currentBots}</span>
+              <span className="text-text-dim text-[13px] ml-1">
+                / {botLimit.data.unlimited ? '∞' : botLimit.data.maxBots} botów
+              </span>
+            </div>
+            {!botLimit.data.allowed && !botLimit.data.unlimited && (
+              <div className="mt-3 text-[12.5px] text-warning bg-warning/10 border border-warning/20 rounded-md px-3 py-2">
+                Osiągnięto limit stron w planie {p.code}. Zmień plan, aby dodać więcej botów.
+              </div>
+            )}
+          </CardBody>
+        </Card>
+      )}
+
       {/* Usage progress */}
       <Card className="mb-4">
         <CardHeader>
@@ -169,6 +212,8 @@ export function BillingPage() {
           </div>
         </CardBody>
       </Card>
+
+      {isOwner && <AddBotDialog open={addBotOpen} onOpenChange={setAddBotOpen} />}
     </>
   );
 }

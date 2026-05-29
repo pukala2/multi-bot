@@ -1,8 +1,11 @@
+import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import type { LucideIcon } from 'lucide-react';
-import { LayoutDashboard, Bot, MessageSquare, Inbox, Settings, BarChart3, Code, LogOut, CreditCard, Building2 } from 'lucide-react';
+import { LayoutDashboard, Bot, MessageSquare, Inbox, Settings, BarChart3, Code, LogOut, CreditCard, Building2, ChevronsUpDown, Check, Plus } from 'lucide-react';
 import { cn } from '@/lib/cn';
-import { useAuth, useLogout, type UserRole } from '@/hooks/useAuth';
+import { botColor, botColorTint } from '@/lib/botColor';
+import { useAuth, useLogout, useSwitchActiveBot, type UserRole } from '@/hooks/useAuth';
+import { AddBotDialog } from '@/components/bots/AddBotDialog';
 
 interface NavItem {
   to: string;
@@ -20,21 +23,21 @@ interface NavGroup {
 const NAV_GROUPS: NavGroup[] = [
   {
     label: 'Główne',
+    // Strony zależne od bota (tenant) — super admin nie ma aktywnego bota, więc je chowamy.
     items: [
-      { to: '/', icon: LayoutDashboard, label: 'Panel' },
-      { to: '/bot', icon: Bot, label: 'Bot' },
-      { to: '/chat', icon: MessageSquare, label: 'Testowy czat' },
-      { to: '/sessions', icon: Inbox, label: 'Sesje' },
-      { to: '/widget', icon: Code, label: 'Widget' },
+      { to: '/', icon: LayoutDashboard, label: 'Panel', hiddenFor: ['SUPER_ADMIN'] },
+      { to: '/bot', icon: Bot, label: 'Bot', hiddenFor: ['SUPER_ADMIN'] },
+      { to: '/chat', icon: MessageSquare, label: 'Testowy czat', hiddenFor: ['SUPER_ADMIN'] },
+      { to: '/sessions', icon: Inbox, label: 'Sesje', hiddenFor: ['SUPER_ADMIN'] },
+      { to: '/widget', icon: Code, label: 'Widget', hiddenFor: ['SUPER_ADMIN'] },
     ],
   },
   {
     label: 'System',
     items: [
-      { to: '/settings', icon: Settings, label: 'Ustawienia' },
-      // Plan i limity to feature per-tenant — super admin (bez tenanta) tego nie ma.
+      { to: '/settings', icon: Settings, label: 'Ustawienia', hiddenFor: ['SUPER_ADMIN'] },
       { to: '/billing', icon: CreditCard, label: 'Plan i limity', hiddenFor: ['SUPER_ADMIN'] },
-      { to: '/analytics', icon: BarChart3, label: 'Analityka' },
+      { to: '/analytics', icon: BarChart3, label: 'Analityka', hiddenFor: ['SUPER_ADMIN'] },
     ],
   },
   {
@@ -44,6 +47,90 @@ const NAV_GROUPS: NavGroup[] = [
     ],
   },
 ];
+
+// Przełącznik aktywnego bota. Widoczny TYLKO gdy organizacja ma >= 2 boty —
+// przy jednym bocie panel wygląda dokładnie jak przed zmianami (brak tej sekcji).
+function BotSwitcher() {
+  const auth = useAuth();
+  const switchBot = useSwitchActiveBot();
+  const [open, setOpen] = useState(false);
+  const [addOpen, setAddOpen] = useState(false);
+
+  const user = auth.data;
+  if (!user || user.role === 'SUPER_ADMIN') return null;
+  const bots = user.bots ?? [];
+  if (bots.length < 2) return null;
+
+  const active = user.activeBot;
+  return (
+    <div className="px-1 pb-2">
+      <div className="px-2 pb-1.5 text-[10px] uppercase tracking-wider text-text-dim font-semibold">
+        Aktywny bot
+      </div>
+      <div className="relative">
+        <button
+          onClick={() => setOpen((o) => !o)}
+          className="flex items-center gap-2.5 w-full px-2.5 py-2 rounded-lg bg-bg-elevated border border-border-strong hover:border-accent transition-colors text-left"
+        >
+          <span
+            className="size-[22px] rounded-md flex items-center justify-center shrink-0"
+            style={{ color: botColor(active?.id ?? ''), backgroundColor: botColorTint(active?.id ?? '') }}
+          >
+            <Bot className="size-3.5" />
+          </span>
+          <span className="flex-1 min-w-0 text-[13.5px] font-semibold truncate">
+            {active?.name ?? 'Wybierz bota'}
+          </span>
+          <ChevronsUpDown className="size-3.5 text-text-dim shrink-0" />
+        </button>
+        {open && (
+          <>
+            <div className="fixed inset-0 z-10" onClick={() => setOpen(false)} />
+            <div className="absolute top-[calc(100%+6px)] left-0 right-0 z-20 bg-bg-elevated border border-border-strong rounded-lg p-1.5 shadow-xl">
+              {bots.map((b) => {
+                const isActive = b.id === active?.id;
+                return (
+                  <button
+                    key={b.id}
+                    disabled={switchBot.isPending}
+                    onClick={() => {
+                      setOpen(false);
+                      if (!isActive) switchBot.mutate(b.id);
+                    }}
+                    className={cn(
+                      'flex items-center gap-2.5 w-full px-2 py-2 rounded-md text-[13px] transition-colors disabled:opacity-50',
+                      isActive ? 'text-text' : 'text-text-muted hover:bg-bg-hover hover:text-text'
+                    )}
+                  >
+                    <span
+                      className="size-5 rounded flex items-center justify-center shrink-0"
+                      style={{ color: botColor(b.id), backgroundColor: botColorTint(b.id) }}
+                    >
+                      <Bot className="size-3" />
+                    </span>
+                    <span className="flex-1 min-w-0 truncate text-left">{b.name}</span>
+                    {isActive && <Check className="size-3.5 text-accent shrink-0" />}
+                  </button>
+                );
+              })}
+              <div className="h-px bg-border my-1.5" />
+              <button
+                onClick={() => { setOpen(false); setAddOpen(true); }}
+                className="flex items-center gap-2.5 w-full px-2 py-2 rounded-md text-[13px] text-accent hover:bg-bg-hover transition-colors"
+              >
+                <span className="size-5 rounded flex items-center justify-center shrink-0">
+                  <Plus className="size-3.5" />
+                </span>
+                Dodaj bota
+              </button>
+            </div>
+          </>
+        )}
+      </div>
+      <AddBotDialog open={addOpen} onOpenChange={setAddOpen} />
+    </div>
+  );
+}
 
 export function Sidebar() {
   const auth = useAuth();
@@ -63,6 +150,8 @@ export function Sidebar() {
         </div>
         <span className="font-semibold text-[15px]">Multibot</span>
       </div>
+
+      <BotSwitcher />
 
       {NAV_GROUPS.map((group) => {
         const visibleItems = group.items.filter((item) => {

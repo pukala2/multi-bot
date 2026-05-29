@@ -6,7 +6,9 @@ import { Card, CardHeader, CardTitle, CardSubtitle } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { PaginationFooter } from '@/components/domain/PaginationFooter';
 import { useSessions } from '@/hooks/useSessions';
-import { shortUuid, timeAgo } from '@/lib/format';
+import { shortUuid, timeAgo, plPlural } from '@/lib/format';
+
+const ROZMOWA_FORMS: [string, string, string] = ['rozmowa', 'rozmowy', 'rozmów'];
 
 export function SessionsPage() {
   const [page, setPage] = useState(0);
@@ -27,7 +29,7 @@ export function SessionsPage() {
             <CardTitle>Lista sesji</CardTitle>
             <CardSubtitle>
               {data?.pagination?.totalElements ?? '—'}{' '}
-              {(data?.pagination?.totalElements ?? 0) === 1 ? 'rozmowa' : 'rozmów'} w bazie
+              {plPlural(data?.pagination?.totalElements ?? 0, ROZMOWA_FORMS)} w bazie
             </CardSubtitle>
           </div>
         </CardHeader>
@@ -89,6 +91,7 @@ export function SessionsPage() {
             size={size}
             totalPages={data.pagination?.totalPages ?? 1}
             totalElements={data.pagination?.totalElements ?? 0}
+            itemForms={ROZMOWA_FORMS}
             onPageChange={setPage}
             onSizeChange={(s) => {
               setSize(s);

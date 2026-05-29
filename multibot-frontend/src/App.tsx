@@ -1,4 +1,4 @@
-import { BrowserRouter, Route, Routes } from 'react-router-dom';
+import { BrowserRouter, Navigate, Route, Routes } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { Toaster } from 'sonner';
 import { AppShell } from '@/components/layout/AppShell';
@@ -16,6 +16,17 @@ import { BillingPage } from '@/pages/BillingPage';
 import { SuperAdminPage } from '@/pages/SuperAdminPage';
 import { LoginPage } from '@/pages/LoginPage';
 import { PlaceholderPage } from '@/pages/PlaceholderPage';
+import { useAuth } from '@/hooks/useAuth';
+
+// Super admin nie ma aktywnego bota -> strona startowa (Panel) jest tenant-scoped i by się wywaliła.
+// Kierujemy go do panelu klientów.
+function HomeRoute() {
+  const auth = useAuth();
+  if (auth.data?.role === 'SUPER_ADMIN') {
+    return <Navigate to="/super-admin" replace />;
+  }
+  return <DashboardPage />;
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -35,7 +46,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route element={<ProtectedRoute />}>
             <Route element={<AppShell />}>
-              <Route path="/" element={<DashboardPage />} />
+              <Route path="/" element={<HomeRoute />} />
               <Route path="/bot" element={<BotPage />} />
               <Route path="/documents" element={<DocumentsPage />} />
               <Route path="/chat" element={<ChatPage />} />

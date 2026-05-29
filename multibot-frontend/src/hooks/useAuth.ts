@@ -4,13 +4,21 @@ import { readCookie } from '@/api/client';
 export type UserRole = 'SUPER_ADMIN' | 'OWNER' | 'ADMIN';
 export type UserStatus = 'ACTIVE' | 'DISABLED' | 'MUST_CHANGE_PASSWORD';
 
+export interface BotSummary {
+  id: string;
+  name: string;
+  slug: string;
+}
+
 export interface CurrentUser {
   id: string;
   email: string;
   role: UserRole;
   status: UserStatus;
-  tenantId: string | null;
+  organizationId: string | null;
   lastLoginAt: string | null;
+  activeBot: BotSummary | null;
+  bots: BotSummary[];
 }
 
 const ME_KEY = ['auth', 'me'] as const;
@@ -59,6 +67,31 @@ export function useLogin() {
     },
     onSuccess: (user) => {
       qc.setQueryData(ME_KEY, user);
+    },
+  });
+}
+
+export function useSwitchActiveBot() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (tenantId: string): Promise<BotSummary> => {
+      const csrf = readCookie('XSRF-TOKEN');
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (csrf) headers['X-XSRF-TOKEN'] = csrf;
+      const r = await fetch('/api/auth/active-bot', {
+        method: 'POST',
+        headers,
+        credentials: 'same-origin',
+        body: JSON.stringify({ tenantId }),
+      });
+      if (!r.ok) throw new Error(`Nie udało się przełączyć bota: HTTP ${r.status}`);
+      return (await r.json()) as BotSummary;
+    },
+    onSuccess: (bot) => {
+      qc.setQueryData(ME_KEY, (old: CurrentUser | null | undefined) =>
+        old ? { ...old, activeBot: bot } : old);
+      // Aktywny bot zmienia tenant -> przeładuj wszystkie dane tenant-scoped (panel, sesje, analityka, ...)
+      qc.invalidateQueries();
     },
   });
 }

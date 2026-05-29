@@ -1,51 +1,82 @@
 import { useState, type FormEvent } from 'react';
-import { Plus, Copy, Check, Building2 } from 'lucide-react';
+import { Plus, Copy, Check, Building2, Bot } from 'lucide-react';
 import { toast } from 'sonner';
 import { Topbar } from '@/components/layout/Topbar';
 import { Card, CardBody } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table';
 import { Dialog, DialogHeader, DialogBody, DialogFooter } from '@/components/ui/dialog';
-import { useTenants, useCreateTenant, type ProvisionResult } from '@/hooks/useSuperAdmin';
+import {
+  useOrganizations,
+  useCreateOrganization,
+  useAddBot,
+  type OrganizationRow,
+  type ProvisionResult,
+  type AddBotResult,
+} from '@/hooks/useSuperAdmin';
 import { cn } from '@/lib/cn';
+import { botColor, botColorTint } from '@/lib/botColor';
 
 const PLANS = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE'];
 
 export function SuperAdminPage() {
-  const tenants = useTenants();
-  const createTenant = useCreateTenant();
+  const orgs = useOrganizations();
+  const createOrg = useCreateOrganization();
+  const addBot = useAddBot();
 
-  const [formOpen, setFormOpen] = useState(false);
-  const [result, setResult] = useState<ProvisionResult | null>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [provisionResult, setProvisionResult] = useState<ProvisionResult | null>(null);
+  const [addBotFor, setAddBotFor] = useState<OrganizationRow | null>(null);
+  const [addBotResult, setAddBotResult] = useState<AddBotResult | null>(null);
 
-  // form fields
+  // create-org form
   const [name, setName] = useState('');
   const [ownerEmail, setOwnerEmail] = useState('');
   const [plan, setPlan] = useState('FREE');
   const [companyName, setCompanyName] = useState('');
   const [nip, setNip] = useState('');
-  const [error, setError] = useState<string | null>(null);
+  const [firstBotName, setFirstBotName] = useState('');
+  const [createError, setCreateError] = useState<string | null>(null);
 
-  function resetForm() {
-    setName(''); setOwnerEmail(''); setPlan('FREE'); setCompanyName(''); setNip(''); setError(null);
+  // add-bot form
+  const [botName, setBotName] = useState('');
+  const [addBotError, setAddBotError] = useState<string | null>(null);
+
+  function resetCreateForm() {
+    setName(''); setOwnerEmail(''); setPlan('FREE'); setCompanyName(''); setNip('');
+    setFirstBotName(''); setCreateError(null);
   }
 
   async function handleCreate(e: FormEvent) {
     e.preventDefault();
-    setError(null);
+    setCreateError(null);
     try {
-      const r = await createTenant.mutateAsync({
+      const r = await createOrg.mutateAsync({
         name, ownerEmail, plan,
         companyName: companyName || undefined,
         nip: nip || undefined,
+        firstBotName: firstBotName || undefined,
       });
-      setFormOpen(false);
-      resetForm();
-      setResult(r);
+      setCreateOpen(false);
+      resetCreateForm();
+      setProvisionResult(r);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Nie udało się utworzyć klienta');
+      setCreateError(err instanceof Error ? err.message : 'Nie udało się utworzyć klienta');
+    }
+  }
+
+  async function handleAddBot(e: FormEvent) {
+    e.preventDefault();
+    if (!addBotFor) return;
+    setAddBotError(null);
+    try {
+      const r = await addBot.mutateAsync({ organizationId: addBotFor.id, name: botName });
+      setAddBotFor(null);
+      setBotName('');
+      setAddBotResult(r);
+    } catch (err) {
+      setAddBotError(err instanceof Error ? err.message : 'Nie udało się dodać bota');
     }
   }
 
@@ -54,77 +85,34 @@ export function SuperAdminPage() {
       <Topbar
         title="Super Admin — Klienci"
         actions={
-          <Button onClick={() => { resetForm(); setFormOpen(true); }}>
-            <Plus className="size-3.5" /> Nowy klient
+          <Button onClick={() => { resetCreateForm(); setCreateOpen(true); }}>
+            <Plus className="size-3.5" /> Nowa organizacja
           </Button>
         }
       />
 
-      <Card>
-        {tenants.isPending ? (
-          <CardBody><div className="h-40 bg-bg-elevated/40 rounded animate-pulse" /></CardBody>
-        ) : !tenants.data || tenants.data.length === 0 ? (
+      {orgs.isPending ? (
+        <Card><CardBody><div className="h-40 bg-bg-elevated/40 rounded animate-pulse" /></CardBody></Card>
+      ) : !orgs.data || orgs.data.length === 0 ? (
+        <Card>
           <CardBody className="py-10 text-center text-text-muted text-[13px]">
-            Brak klientów. Utwórz pierwszego przyciskiem „Nowy klient".
+            Brak klientów. Utwórz pierwszego przyciskiem „Nowa organizacja".
           </CardBody>
-        ) : (
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>Klient</TableHead>
-                <TableHead>Plan</TableHead>
-                <TableHead>Wiadomości</TableHead>
-                <TableHead>NIP</TableHead>
-                <TableHead>Status</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {tenants.data.map((t) => {
-                const unlimited = t.effectiveLimit === -1;
-                const pct = unlimited || t.effectiveLimit === 0
-                  ? 0 : Math.round((t.userMessages / t.effectiveLimit) * 100);
-                return (
-                  <TableRow key={t.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2.5">
-                        <div className="size-7 rounded-md bg-bg-elevated flex items-center justify-center text-text-muted">
-                          <Building2 className="size-3.5" />
-                        </div>
-                        <div>
-                          <div className="text-[13px] font-medium">{t.name}</div>
-                          <div className="text-[11px] text-text-dim mono">{t.slug}</div>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={t.plan === 'FREE' ? 'neutral' : 'info'}>{t.plan}</Badge>
-                    </TableCell>
-                    <TableCell>
-                      <span className={cn('font-medium', pct >= 100 && 'text-error', pct >= 80 && pct < 100 && 'text-warning')}>
-                        {t.userMessages.toLocaleString('pl-PL')}
-                      </span>
-                      <span className="text-text-dim"> / {unlimited ? '∞' : t.effectiveLimit.toLocaleString('pl-PL')}</span>
-                    </TableCell>
-                    <TableCell className="text-text-muted mono text-[12px]">{t.nip ?? '—'}</TableCell>
-                    <TableCell>
-                      {t.status === 'ACTIVE'
-                        ? <span className="text-success text-[12px]">● aktywny</span>
-                        : <span className="text-text-dim text-[12px]">● {t.status.toLowerCase()}</span>}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        )}
-      </Card>
+        </Card>
+      ) : (
+        <div className="space-y-3">
+          {orgs.data.map((org) => (
+            <OrganizationCard key={org.id} org={org} onAddBot={() => { setBotName(''); setAddBotError(null); setAddBotFor(org); }} />
+          ))}
+        </div>
+      )}
 
-      {/* Formularz nowego klienta */}
-      <Dialog open={formOpen} onOpenChange={setFormOpen}>
+      {/* Nowa organizacja */}
+      <Dialog open={createOpen} onOpenChange={setCreateOpen}>
         <DialogHeader
-          title="Nowy klient"
-          description="Tworzy tenant + konto OWNER + bota + widget. Hasło wygeneruje się automatycznie."
-          onClose={() => setFormOpen(false)}
+          title="Nowa organizacja"
+          description="Tworzy klienta + konto OWNER + pierwszego bota + widget. Hasło wygeneruje się automatycznie."
+          onClose={() => setCreateOpen(false)}
         />
         <form onSubmit={handleCreate}>
           <DialogBody className="space-y-3">
@@ -134,15 +122,20 @@ export function SuperAdminPage() {
             <Field label="Email właściciela (login) *">
               <Input type="email" value={ownerEmail} onChange={(e) => setOwnerEmail(e.target.value)} placeholder="kontakt@firma.pl" required />
             </Field>
-            <Field label="Plan">
-              <select
-                value={plan}
-                onChange={(e) => setPlan(e.target.value)}
-                className="h-8 w-full rounded-md border border-border bg-bg-panel px-3 text-[13px] text-text focus-visible:outline-none focus-visible:border-accent"
-              >
-                {PLANS.map((p) => <option key={p} value={p}>{p}</option>)}
-              </select>
-            </Field>
+            <div className="grid grid-cols-2 gap-3">
+              <Field label="Plan">
+                <select
+                  value={plan}
+                  onChange={(e) => setPlan(e.target.value)}
+                  className="h-8 w-full rounded-md border border-border bg-bg-panel px-3 text-[13px] text-text focus-visible:outline-none focus-visible:border-accent"
+                >
+                  {PLANS.map((p) => <option key={p} value={p}>{p}</option>)}
+                </select>
+              </Field>
+              <Field label="Nazwa pierwszego bota (opcj.)">
+                <Input value={firstBotName} onChange={(e) => setFirstBotName(e.target.value)} placeholder="domyślnie = nazwa klienta" />
+              </Field>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Nazwa firmy (opcj.)">
                 <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Firma Sp. z o.o." />
@@ -151,44 +144,155 @@ export function SuperAdminPage() {
                 <Input value={nip} onChange={(e) => setNip(e.target.value)} placeholder="1234567890" />
               </Field>
             </div>
-            {error && (
-              <div className="text-[12px] text-error bg-error/10 border border-error/20 rounded-md px-3 py-2">{error}</div>
+            {createError && (
+              <div className="text-[12px] text-error bg-error/10 border border-error/20 rounded-md px-3 py-2">{createError}</div>
             )}
           </DialogBody>
           <DialogFooter>
-            <Button type="button" variant="secondary" onClick={() => setFormOpen(false)}>Anuluj</Button>
-            <Button type="submit" disabled={createTenant.isPending || !name || !ownerEmail}>
-              {createTenant.isPending ? 'Tworzę…' : 'Utwórz klienta'}
+            <Button type="button" variant="secondary" onClick={() => setCreateOpen(false)}>Anuluj</Button>
+            <Button type="submit" disabled={createOrg.isPending || !name || !ownerEmail}>
+              {createOrg.isPending ? 'Tworzę…' : 'Utwórz klienta'}
             </Button>
           </DialogFooter>
         </form>
       </Dialog>
 
-      {/* Wynik — dane do przekazania (pokazane RAZ) */}
-      <Dialog open={result !== null} onOpenChange={(o) => !o && setResult(null)}>
-        {result && (
+      {/* Dodaj bota */}
+      <Dialog open={addBotFor !== null} onOpenChange={(o) => !o && setAddBotFor(null)}>
+        <DialogHeader
+          title={`Nowy bot — ${addBotFor?.name ?? ''}`}
+          description="Tworzy kolejnego bota (tenant + wersja v1 + widget) w tej organizacji. Limit wiadomości pozostaje wspólny."
+          onClose={() => setAddBotFor(null)}
+        />
+        <form onSubmit={handleAddBot}>
+          <DialogBody className="space-y-3">
+            <Field label="Nazwa bota *">
+              <Input value={botName} onChange={(e) => setBotName(e.target.value)} placeholder="Sklep meblowy" required autoFocus />
+            </Field>
+            {addBotError && (
+              <div className="text-[12px] text-error bg-error/10 border border-error/20 rounded-md px-3 py-2">{addBotError}</div>
+            )}
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={() => setAddBotFor(null)}>Anuluj</Button>
+            <Button type="submit" disabled={addBot.isPending || !botName}>
+              {addBot.isPending ? 'Tworzę…' : 'Dodaj bota'}
+            </Button>
+          </DialogFooter>
+        </form>
+      </Dialog>
+
+      {/* Wynik provisioningu organizacji (pokazany RAZ) */}
+      <Dialog open={provisionResult !== null} onOpenChange={(o) => !o && setProvisionResult(null)}>
+        {provisionResult && (
           <>
             <DialogHeader
               title="Klient utworzony ✓"
               description="Skopiuj dane i przekaż klientowi. Hasło pokazujemy TYLKO TERAZ."
-              onClose={() => setResult(null)}
+              onClose={() => setProvisionResult(null)}
             />
             <DialogBody className="space-y-2.5">
-              <CopyRow label="Klient" value={result.tenantName} />
-              <CopyRow label="Login" value={result.ownerEmail} />
-              <CopyRow label="Hasło" value={result.generatedPassword} highlight />
-              <CopyRow label="Klucz widgeta" value={result.widgetKey} />
+              <CopyRow label="Klient" value={provisionResult.organizationName} />
+              <CopyRow label="Login" value={provisionResult.ownerEmail} />
+              <CopyRow label="Hasło" value={provisionResult.generatedPassword} highlight />
+              <CopyRow label="Pierwszy bot" value={provisionResult.firstBotName} />
+              <CopyRow label="Klucz widgeta" value={provisionResult.widgetKey} />
               <div className="text-[12px] text-warning bg-warning/10 border border-warning/20 rounded-md px-3 py-2 mt-2">
                 Zapisz hasło teraz — po zamknięciu nie odzyskasz go (tylko reset).
               </div>
             </DialogBody>
             <DialogFooter>
-              <Button onClick={() => setResult(null)}>Gotowe</Button>
+              <Button onClick={() => setProvisionResult(null)}>Gotowe</Button>
+            </DialogFooter>
+          </>
+        )}
+      </Dialog>
+
+      {/* Wynik dodania bota (klucz widgeta pokazany RAZ) */}
+      <Dialog open={addBotResult !== null} onOpenChange={(o) => !o && setAddBotResult(null)}>
+        {addBotResult && (
+          <>
+            <DialogHeader
+              title="Bot dodany ✓"
+              description="Przekaż klientowi klucz widgeta do osadzenia na stronie."
+              onClose={() => setAddBotResult(null)}
+            />
+            <DialogBody className="space-y-2.5">
+              <CopyRow label="Bot" value={addBotResult.botName} />
+              <CopyRow label="Klucz widgeta" value={addBotResult.widgetKey} highlight />
+            </DialogBody>
+            <DialogFooter>
+              <Button onClick={() => setAddBotResult(null)}>Gotowe</Button>
             </DialogFooter>
           </>
         )}
       </Dialog>
     </>
+  );
+}
+
+function OrganizationCard({ org, onAddBot }: { org: OrganizationRow; onAddBot: () => void }) {
+  const unlimited = org.effectiveLimit === -1;
+  const pct = unlimited || org.effectiveLimit === 0
+    ? 0 : Math.round((org.userMessages / org.effectiveLimit) * 100);
+
+  return (
+    <Card>
+      <CardBody>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="size-9 rounded-lg bg-bg-elevated flex items-center justify-center text-text-muted shrink-0">
+              <Building2 className="size-4" />
+            </div>
+            <div className="min-w-0">
+              <div className="text-[14px] font-semibold truncate">{org.name}</div>
+              <div className="text-[11px] text-text-dim mono">{org.slug}{org.nip ? ` · NIP ${org.nip}` : ''}</div>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <Badge variant={org.plan === 'FREE' ? 'neutral' : 'info'}>{org.plan}</Badge>
+            {org.status === 'ACTIVE'
+              ? <span className="text-success text-[12px]">● aktywny</span>
+              : <span className="text-text-dim text-[12px]">● {org.status.toLowerCase()}</span>}
+          </div>
+        </div>
+
+        <div className="mt-3 text-[12px]">
+          <span className="text-text-dim">Wiadomości (limit wspólny): </span>
+          <span className={cn('font-medium', pct >= 100 && 'text-error', pct >= 80 && pct < 100 && 'text-warning')}>
+            {org.userMessages.toLocaleString('pl-PL')}
+          </span>
+          <span className="text-text-dim"> / {unlimited ? '∞' : org.effectiveLimit.toLocaleString('pl-PL')}</span>
+        </div>
+
+        <div className="mt-3 border-t border-border pt-3">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-[11px] uppercase tracking-wider text-text-dim font-semibold">
+              Boty ({org.bots.length})
+            </div>
+            <Button variant="secondary" size="sm" onClick={onAddBot}>
+              <Plus className="size-3" /> Dodaj bota
+            </Button>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            {org.bots.map((b) => (
+              <div key={b.id} className="flex items-center gap-2.5 bg-bg-elevated rounded-md px-3 py-2">
+                <span
+                  className="size-6 rounded flex items-center justify-center shrink-0"
+                  style={{ color: botColor(b.id), backgroundColor: botColorTint(b.id) }}
+                >
+                  <Bot className="size-3.5" />
+                </span>
+                <div className="min-w-0">
+                  <div className="text-[13px] font-medium truncate">{b.name}</div>
+                  <div className="text-[11px] text-text-dim">{b.userMessages.toLocaleString('pl-PL')} wiad.</div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </CardBody>
+    </Card>
   );
 }
 
