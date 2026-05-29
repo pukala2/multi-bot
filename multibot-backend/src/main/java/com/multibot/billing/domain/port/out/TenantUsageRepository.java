@@ -12,6 +12,12 @@ public interface TenantUsageRepository {
     TenantUsage findCurrent(TenantId tenantId, LocalDate periodMonth);
 
     /**
+     * Suma user_messages WSZYSTKICH botow organizacji do ktorej nalezy podany bot, w danym miesiacu.
+     * Limit jest wspolny (pooled) na cala organizacje, wiec to ta liczba liczy sie do limitu.
+     */
+    long sumUserMessagesForOrgOf(TenantId tenantId, LocalDate periodMonth);
+
+    /**
      * UPSERT + atomowy +1 do user_messages. Zwraca nowa wartosc countera.
      * Race-safe nawet przy rownoleglych zapytaniach.
      */

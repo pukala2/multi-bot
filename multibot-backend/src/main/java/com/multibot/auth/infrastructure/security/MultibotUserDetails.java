@@ -4,7 +4,7 @@ import com.multibot.auth.domain.model.Role;
 import com.multibot.auth.domain.model.User;
 import com.multibot.auth.domain.model.UserId;
 import com.multibot.auth.domain.model.UserStatus;
-import com.multibot.shared.tenant.TenantId;
+import com.multibot.shared.organization.OrganizationId;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -29,7 +29,7 @@ public final class MultibotUserDetails implements UserDetails, Serializable {
     private final String passwordHash;
     private final Role role;
     private final UserStatus status;
-    private final UUID tenantId;        // nullable: null = SUPER_ADMIN
+    private final UUID organizationId;        // nullable: null = SUPER_ADMIN
 
     public MultibotUserDetails(User user) {
         this.userId = user.id().value();
@@ -37,15 +37,15 @@ public final class MultibotUserDetails implements UserDetails, Serializable {
         this.passwordHash = user.passwordHash();
         this.role = user.role();
         this.status = user.status();
-        this.tenantId = user.tenantId() == null ? null : user.tenantId().value();
+        this.organizationId = user.organizationId() == null ? null : user.organizationId().value();
     }
 
     public UserId userId() {
         return UserId.of(userId);
     }
 
-    public Optional<TenantId> tenantIdAsOptional() {
-        return Optional.ofNullable(tenantId).map(TenantId::of);
+    public Optional<OrganizationId> organizationIdAsOptional() {
+        return Optional.ofNullable(organizationId).map(OrganizationId::of);
     }
 
     public Role role() {

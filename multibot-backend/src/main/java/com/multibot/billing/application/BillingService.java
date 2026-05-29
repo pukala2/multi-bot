@@ -1,14 +1,17 @@
 package com.multibot.billing.application;
 
 import com.multibot.billing.domain.model.BillingPlan;
+import com.multibot.billing.domain.model.BotLimitDecision;
 import com.multibot.billing.domain.model.MessageLimitDecision;
 import com.multibot.billing.domain.model.TenantPlanInfo;
 import com.multibot.billing.domain.model.TenantUsage;
+import com.multibot.billing.domain.port.in.CheckBotLimitUseCase;
 import com.multibot.billing.domain.port.in.CheckMessageLimitUseCase;
 import com.multibot.billing.domain.port.in.GetUsageUseCase;
 import com.multibot.billing.domain.port.in.IncrementUsageUseCase;
 import com.multibot.billing.domain.port.out.BillingPlanRepository;
 import com.multibot.billing.domain.port.out.TenantUsageRepository;
+import com.multibot.shared.organization.OrganizationId;
 import com.multibot.shared.tenant.TenantId;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,7 +22,7 @@ import java.time.YearMonth;
 import java.time.temporal.ChronoUnit;
 
 @Service
-class BillingService implements CheckMessageLimitUseCase, IncrementUsageUseCase, GetUsageUseCase {
+class BillingService implements CheckMessageLimitUseCase, IncrementUsageUseCase, GetUsageUseCase, CheckBotLimitUseCase {
 
     private final BillingPlanRepository planRepository;
     private final TenantUsageRepository usageRepository;
@@ -35,13 +38,21 @@ class BillingService implements CheckMessageLimitUseCase, IncrementUsageUseCase,
     public MessageLimitDecision check(TenantId tenantId) {
         TenantPlanInfo info = requirePlanInfo(tenantId);
         LocalDate period = currentPeriodMonth();
-        TenantUsage usage = usageRepository.findCurrent(tenantId, period);
+        // Limit wspolny: liczymy sume wiadomosci WSZYSTKICH botow organizacji.
+        long used = usageRepository.sumUserMessagesForOrgOf(tenantId, period);
 
         int effective = info.effectiveLimit();
-        long used = usage.userMessages();
         boolean allowed = effective == -1 || used < effective;
 
         return new MessageLimitDecision(allowed, effective, used, nextPeriodMonth(period));
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public BotLimitDecision check(OrganizationId organizationId, int currentBotCount) {
+        int maxBots = planRepository.findEffectiveMaxBotsForOrg(organizationId);
+        boolean allowed = maxBots == -1 || currentBotCount < maxBots;
+        return new BotLimitDecision(allowed, currentBotCount, maxBots);
     }
 
     @Override
@@ -60,6 +71,12 @@ class BillingService implements CheckMessageLimitUseCase, IncrementUsageUseCase,
     @Transactional(readOnly = true)
     public TenantUsage getCurrentUsage(TenantId tenantId) {
         return usageRepository.findCurrent(tenantId, currentPeriodMonth());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public long getPooledUsedMessages(TenantId tenantId) {
+        return usageRepository.sumUserMessagesForOrgOf(tenantId, currentPeriodMonth());
     }
 
     @Override

@@ -10,6 +10,7 @@ public record BillingPlan(
         String code,
         String name,
         int monthlyMessagesLimit,
+        Integer maxBots,           // null = bez limitu botow (Enterprise)
         boolean customDomainAllowed,
         boolean apiAccessAllowed,
         Integer pricePlnMonthly,   // null = custom pricing

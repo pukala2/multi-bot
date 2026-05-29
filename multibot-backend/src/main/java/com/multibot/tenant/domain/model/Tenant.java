@@ -1,19 +1,23 @@
 package com.multibot.tenant.domain.model;
 
+import com.multibot.shared.organization.OrganizationId;
 import com.multibot.shared.tenant.TenantId;
 import com.multibot.shared.tenant.TenantOwned;
 
 import java.time.Instant;
 import java.util.Objects;
 
+/**
+ * Tenant = BOT klienta. Granica izolacji danych (dokumenty, wektory, wersje, widget, czat, usage).
+ * Plan, limity i dane firmowe sa na poziomie organizacji ({@link OrganizationId}), nie tutaj —
+ * wszystkie boty jednej organizacji wspoldziela limit wiadomosci.
+ */
 public record Tenant(
         TenantId id,
         String name,
         TenantSlug slug,
-        TenantPlan plan,
+        OrganizationId organizationId,
         TenantStatus status,
-        String companyName,   // nullable — formalna nazwa firmy (do faktur)
-        String nip,           // nullable — NIP
         Instant createdAt,
         Instant updatedAt
 ) implements TenantOwned {
@@ -22,7 +26,7 @@ public record Tenant(
         Objects.requireNonNull(id, "id");
         Objects.requireNonNull(name, "name");
         Objects.requireNonNull(slug, "slug");
-        Objects.requireNonNull(plan, "plan");
+        Objects.requireNonNull(organizationId, "organizationId");
         Objects.requireNonNull(status, "status");
         Objects.requireNonNull(createdAt, "createdAt");
         Objects.requireNonNull(updatedAt, "updatedAt");

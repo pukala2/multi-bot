@@ -36,6 +36,8 @@ class BillingController {
         TenantId tenant = TenantContext.get();
         BillingPlan plan = getUsageUseCase.getPlan(tenant);
         TenantUsage usage = getUsageUseCase.getCurrentUsage(tenant);
+        // Limit jest wspolny dla calej organizacji -> pokazujemy sume wiadomosci wszystkich botow.
+        long usedMessages = getUsageUseCase.getPooledUsedMessages(tenant);
         int effectiveLimit = getUsageUseCase.getEffectiveLimit(tenant);
 
         LocalDate today = LocalDate.now();
@@ -43,14 +45,14 @@ class BillingController {
         long daysToReset = ChronoUnit.DAYS.between(today, nextReset);
 
         double percent = effectiveLimit == -1 ? 0.0
-                : (effectiveLimit == 0 ? 0.0 : (usage.userMessages() * 100.0) / effectiveLimit);
+                : (effectiveLimit == 0 ? 0.0 : (usedMessages * 100.0) / effectiveLimit);
 
         Map<String, Object> body = new HashMap<>();
         body.put("plan", plan.code());
         body.put("planName", plan.name());
         body.put("monthlyMessagesLimit", plan.monthlyMessagesLimit());
         body.put("effectiveLimit", effectiveLimit);
-        body.put("userMessages", usage.userMessages());
+        body.put("userMessages", usedMessages);
         body.put("aiMessages", usage.aiMessages());
         body.put("periodMonth", usage.periodMonth().toString());
         body.put("resetsAt", nextReset.atStartOfDay().toString() + "Z");
@@ -71,6 +73,7 @@ class BillingController {
         body.put("name", plan.name());
         body.put("monthlyMessagesLimit", plan.monthlyMessagesLimit());
         body.put("effectiveLimit", effectiveLimit);
+        body.put("maxBots", plan.maxBots());   // null = bez limitu
         body.put("customDomainAllowed", plan.customDomainAllowed());
         body.put("apiAccessAllowed", plan.apiAccessAllowed());
         body.put("pricePlnMonthly", plan.pricePlnMonthly());

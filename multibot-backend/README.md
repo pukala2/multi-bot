@@ -59,11 +59,17 @@ open http://localhost:8080/swagger-ui.html
 
 | Profil | Aktywacja | Co robi |
 |--------|-----------|---------|
-| `dev` | default | Plain logs, SQL w konsoli, Swagger UI enabled, mock tenant |
-| `test` | `mvn test` | Testcontainers Postgres, mock LLM, silent logs |
-| `prod` | `SPRING_PROFILES_ACTIVE=prod` | JSON logs, Swagger off, real auth (post-MVP) |
+| `dev` | default | Plain logs, Swagger UI, **auth włączone** (`multibot.tenancy.mode=auth`), bootstrap super admina + demo ownera |
+| `test` | `mvn test` / `verify` | Testcontainers Postgres, mock LLM/embeddingi, `mode=mock` (DEFAULT tenant) |
+| `prod` | `SPRING_PROFILES_ACTIVE=prod` | JSON logs, Swagger off, auth (sesje cookie + CSRF) |
 
 Zmiana profilu: `SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run`.
+
+### Konta bootstrap (dev — z `application.yml`, nadpisywalne env)
+- **Super admin:** `superadmin@multibot.local` / `Multibot!2026` → panel „Klienci" (tworzy organizacje + boty).
+- **Demo owner:** `owner@demo.local` / `Demo!Owner2026` → owner domyślnej organizacji (1 bot).
+
+Model: **Organizacja (klient) → Boty**. User loguje się sesją (cookie), wybiera aktywnego bota; limit wiadomości wspólny dla organizacji. Szczegóły: [`../docs/architecture/multi-tenancy.md`](../docs/architecture/multi-tenancy.md).
 
 ---
 
@@ -76,17 +82,21 @@ multibot-backend/
 │   ├── main/
 │   │   ├── java/com/multibot/
 │   │   │   ├── MultibotApplication.java
-│   │   │   ├── shared/              # shared kernel (do utworzenia gdy implementujemy)
-│   │   │   ├── tenancy/             # multi-tenancy infrastructure
-│   │   │   ├── config/              # Spring @Configuration
+│   │   │   ├── shared/              # shared kernel (TenantId, OrganizationId, wyjątki)
+│   │   │   ├── tenancy/             # multi-tenancy infrastructure (TenantContext, resolvery)
+│   │   │   ├── config/              # Spring @Configuration (GlobalExceptionHandler)
 │   │   │   ├── ai/                  # Spring AI beans
-│   │   │   ├── tenant/              # business module
-│   │   │   ├── file/                # business module
-│   │   │   ├── vector/              # business module
-│   │   │   ├── document/            # business module
-│   │   │   ├── indexing/            # orchestrator module
-│   │   │   ├── chat/                # business module
-│   │   │   └── rag/                 # orchestrator module
+│   │   │   ├── organization/        # klient platformy (ponad botami)
+│   │   │   ├── tenant/              # = BOT (granica izolacji; ma organization_id)
+│   │   │   ├── auth/                # logowanie, użytkownicy, sesje, SecurityConfig
+│   │   │   ├── billing/             # plany, zużycie, limity (pooled + max_bots)
+│   │   │   ├── security/            # tarcza widgetu (WidgetGuardFilter, rate-limit, Turnstile)
+│   │   │   ├── superadmin/          # provisioning klientów (SUPER_ADMIN)
+│   │   │   ├── bots/                # provisioning bota + self-serve ownera
+│   │   │   ├── widget/ botversion/  # konfig+klucz widgetu; wersjonowanie bota
+│   │   │   ├── file/ vector/        # storage plików; pgvector + tenant filter
+│   │   │   ├── document/ indexing/  # dokumenty; async pipeline indeksacji
+│   │   │   └── chat/ rag/           # sesje+wiadomości (SSE); RAG orchestrator
 │   │   └── resources/
 │   │       ├── application.yml
 │   │       ├── application-dev.yml

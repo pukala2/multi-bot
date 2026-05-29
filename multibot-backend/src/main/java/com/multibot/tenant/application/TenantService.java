@@ -1,10 +1,10 @@
 package com.multibot.tenant.application;
 
+import com.multibot.shared.organization.OrganizationId;
 import com.multibot.shared.tenant.TenantId;
 import com.multibot.shared.util.UuidGenerator;
 import com.multibot.tenant.domain.exception.TenantNotFoundException;
 import com.multibot.tenant.domain.model.Tenant;
-import com.multibot.tenant.domain.model.TenantPlan;
 import com.multibot.tenant.domain.model.TenantSlug;
 import com.multibot.tenant.domain.model.TenantStatus;
 import com.multibot.tenant.domain.port.in.CreateTenantUseCase;
@@ -47,18 +47,21 @@ class TenantService implements GetTenantUseCase, CreateTenantUseCase, ListTenant
     }
 
     @Override
+    public List<Tenant> listByOrganization(OrganizationId organizationId) {
+        return tenantRepository.findByOrganizationId(organizationId);
+    }
+
+    @Override
     @Transactional
-    public Tenant create(String name, TenantPlan plan, String companyName, String nip) {
+    public Tenant create(OrganizationId organizationId, String name) {
         TenantSlug slug = uniqueSlug(name);
         Instant now = Instant.now();
         Tenant tenant = new Tenant(
                 TenantId.of(UuidGenerator.newUuidV7()),
                 name,
                 slug,
-                plan,
+                organizationId,
                 TenantStatus.ACTIVE,
-                (companyName == null || companyName.isBlank()) ? null : companyName,
-                (nip == null || nip.isBlank()) ? null : nip,
                 now, now);
         return tenantRepository.save(tenant);
     }
@@ -80,7 +83,7 @@ class TenantService implements GetTenantUseCase, CreateTenantUseCase, ListTenant
                 .toLowerCase(Locale.ROOT)
                 .replaceAll("[^a-z0-9]+", "-")
                 .replaceAll("(^-+)|(-+$)", "");
-        if (s.length() < 3) s = "tenant-" + (s.isBlank() ? "x" : s);
+        if (s.length() < 3) s = "bot-" + (s.isBlank() ? "x" : s);
         if (s.length() > 64) s = s.substring(0, 64).replaceAll("-+$", "");
         return s;
     }

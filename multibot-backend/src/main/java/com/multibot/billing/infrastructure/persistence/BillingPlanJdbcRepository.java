@@ -3,7 +3,9 @@ package com.multibot.billing.infrastructure.persistence;
 import com.multibot.billing.domain.model.BillingPlan;
 import com.multibot.billing.domain.model.TenantPlanInfo;
 import com.multibot.billing.domain.port.out.BillingPlanRepository;
+import com.multibot.shared.organization.OrganizationId;
 import com.multibot.shared.tenant.TenantId;
+import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
@@ -25,7 +27,7 @@ class BillingPlanJdbcRepository implements BillingPlanRepository {
     @Override
     public Optional<BillingPlan> findByCode(String code) {
         List<BillingPlan> result = jdbc.query(
-                "SELECT code, name, monthly_messages_limit, custom_domain_allowed, " +
+                "SELECT code, name, monthly_messages_limit, max_bots, custom_domain_allowed, " +
                         "api_access_allowed, price_pln_monthly, display_order, active " +
                         "FROM billing_plans WHERE code = ? LIMIT 1",
                 planMapper(), code);
@@ -35,21 +37,39 @@ class BillingPlanJdbcRepository implements BillingPlanRepository {
     @Override
     public List<BillingPlan> findAllActive() {
         return jdbc.query(
-                "SELECT code, name, monthly_messages_limit, custom_domain_allowed, " +
+                "SELECT code, name, monthly_messages_limit, max_bots, custom_domain_allowed, " +
                         "api_access_allowed, price_pln_monthly, display_order, active " +
                         "FROM billing_plans WHERE active = TRUE ORDER BY display_order",
                 planMapper());
     }
 
     @Override
+    public int findEffectiveMaxBotsForOrg(OrganizationId organizationId) {
+        try {
+            Integer max = jdbc.queryForObject("""
+                    SELECT COALESCE(o.max_bots_override, bp.max_bots)
+                    FROM organizations o
+                    JOIN billing_plans bp ON bp.code = o.plan
+                    WHERE o.id = ?
+                    """,
+                    Integer.class,
+                    organizationId.value());
+            return max == null ? -1 : max;   // -1 = bez limitu
+        } catch (EmptyResultDataAccessException e) {
+            throw new IllegalStateException("Organization " + organizationId.value() + " has no plan assigned");
+        }
+    }
+
+    @Override
     public Optional<TenantPlanInfo> findTenantPlanInfo(TenantId tenantId) {
         List<TenantPlanInfo> result = jdbc.query("""
                 SELECT
-                  bp.code, bp.name, bp.monthly_messages_limit, bp.custom_domain_allowed,
+                  bp.code, bp.name, bp.monthly_messages_limit, bp.max_bots, bp.custom_domain_allowed,
                   bp.api_access_allowed, bp.price_pln_monthly, bp.display_order, bp.active,
-                  COALESCE(t.monthly_messages_limit_override, bp.monthly_messages_limit) AS effective_limit
+                  COALESCE(o.monthly_messages_limit_override, bp.monthly_messages_limit) AS effective_limit
                 FROM tenants t
-                JOIN billing_plans bp ON bp.code = t.plan
+                JOIN organizations o ON o.id = t.organization_id
+                JOIN billing_plans bp ON bp.code = o.plan
                 WHERE t.id = ?
                 LIMIT 1
                 """,
@@ -68,10 +88,12 @@ class BillingPlanJdbcRepository implements BillingPlanRepository {
 
     private static BillingPlan mapPlan(ResultSet rs) throws SQLException {
         Integer price = rs.getObject("price_pln_monthly", Integer.class);
+        Integer maxBots = rs.getObject("max_bots", Integer.class);
         return new BillingPlan(
                 rs.getString("code"),
                 rs.getString("name"),
                 rs.getInt("monthly_messages_limit"),
+                maxBots,
                 rs.getBoolean("custom_domain_allowed"),
                 rs.getBoolean("api_access_allowed"),
                 price,

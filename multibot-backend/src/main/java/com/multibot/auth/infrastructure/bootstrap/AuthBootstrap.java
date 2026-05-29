@@ -5,7 +5,7 @@ import com.multibot.auth.domain.model.User;
 import com.multibot.auth.domain.model.UserId;
 import com.multibot.auth.domain.model.UserStatus;
 import com.multibot.auth.domain.port.out.UserRepository;
-import com.multibot.shared.tenant.TenantId;
+import com.multibot.shared.organization.OrganizationId;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.context.event.ApplicationReadyEvent;
@@ -28,7 +28,8 @@ import java.util.UUID;
 class AuthBootstrap {
 
     private static final Logger log = LoggerFactory.getLogger(AuthBootstrap.class);
-    private static final UUID DEFAULT_TENANT_ID = UUID.fromString("00000000-0000-7000-8000-000000000001");
+    // Po migracji organizations: id domyslnej organizacji == id domyslnego tenanta (backfill 1:1).
+    private static final UUID DEFAULT_ORGANIZATION_ID = UUID.fromString("00000000-0000-7000-8000-000000000001");
 
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
@@ -45,8 +46,8 @@ class AuthBootstrap {
         this.props = props;
     }
 
-    @EventListener(ApplicationReadyEvent.class)
-    void bootstrap() {
+    @EventListener
+    void bootstrap(ApplicationReadyEvent event) {
         bootstrapSuperAdmin();
         if (props.defaultTenant() != null && props.defaultTenant().enabled()) {
             bootstrapDefaultTenantOwner();
@@ -76,11 +77,11 @@ class AuthBootstrap {
     }
 
     private void bootstrapDefaultTenantOwner() {
-        // Sprawdz czy Default Tenant istnieje (z migracji V20260522_0101)
-        Integer tenantExists = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM tenants WHERE id = ?", Integer.class, DEFAULT_TENANT_ID);
-        if (tenantExists == null || tenantExists == 0) {
-            log.info("Default Tenant not found in DB, skipping demo owner bootstrap");
+        // Sprawdz czy domyslna organizacja istnieje (backfill migracji organizations)
+        Integer orgExists = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM organizations WHERE id = ?", Integer.class, DEFAULT_ORGANIZATION_ID);
+        if (orgExists == null || orgExists == 0) {
+            log.info("Default organization not found in DB, skipping demo owner bootstrap");
             return;
         }
 
@@ -93,17 +94,17 @@ class AuthBootstrap {
         }
 
         Instant now = Instant.now();
-        User owner = User.newTenantUser(
+        User owner = User.newOrgUser(
                 UserId.generate(),
                 email,
                 passwordEncoder.encode(props.defaultTenant().ownerPassword()),
                 Role.OWNER,
-                TenantId.of(DEFAULT_TENANT_ID),
+                OrganizationId.of(DEFAULT_ORGANIZATION_ID),
                 findFirstSuperAdminId().orElseThrow(),
                 UserStatus.ACTIVE,
                 now);
         userRepository.save(owner);
-        log.warn("BOOTSTRAP: created OWNER '{}' for Default Tenant", email);
+        log.warn("BOOTSTRAP: created OWNER '{}' for default organization", email);
     }
 
     private java.util.Optional<UserId> findFirstSuperAdminId() {

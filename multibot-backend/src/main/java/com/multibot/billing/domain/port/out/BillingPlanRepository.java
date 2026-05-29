@@ -2,6 +2,7 @@ package com.multibot.billing.domain.port.out;
 
 import com.multibot.billing.domain.model.BillingPlan;
 import com.multibot.billing.domain.model.TenantPlanInfo;
+import com.multibot.shared.organization.OrganizationId;
 import com.multibot.shared.tenant.TenantId;
 
 import java.util.List;
@@ -15,4 +16,7 @@ public interface BillingPlanRepository {
 
     /** Plan + efektywny limit dla tenanta (z uwzglednieniem override). */
     Optional<TenantPlanInfo> findTenantPlanInfo(TenantId tenantId);
+
+    /** Efektywny limit botow organizacji (override ?? plan). -1 = bez limitu. */
+    int findEffectiveMaxBotsForOrg(OrganizationId organizationId);
 }

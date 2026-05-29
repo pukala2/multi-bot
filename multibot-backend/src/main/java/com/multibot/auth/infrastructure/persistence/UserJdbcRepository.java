@@ -5,13 +5,12 @@ import com.multibot.auth.domain.model.User;
 import com.multibot.auth.domain.model.UserId;
 import com.multibot.auth.domain.model.UserStatus;
 import com.multibot.auth.domain.port.out.UserRepository;
-import com.multibot.shared.tenant.TenantId;
+import com.multibot.shared.organization.OrganizationId;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.stereotype.Repository;
 
 import java.sql.Timestamp;
-import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -28,7 +27,7 @@ class UserJdbcRepository implements UserRepository {
     @Override
     public Optional<User> findByEmail(String email) {
         List<User> result = jdbc.query(
-                "SELECT id, email, password_hash, role, status, tenant_id, created_by, " +
+                "SELECT id, email, password_hash, role, status, organization_id, created_by, " +
                         "created_at, updated_at, last_login_at " +
                         "FROM users WHERE lower(email) = lower(?) LIMIT 1",
                 rowMapper(), email);
@@ -38,7 +37,7 @@ class UserJdbcRepository implements UserRepository {
     @Override
     public Optional<User> findById(UserId id) {
         List<User> result = jdbc.query(
-                "SELECT id, email, password_hash, role, status, tenant_id, created_by, " +
+                "SELECT id, email, password_hash, role, status, organization_id, created_by, " +
                         "created_at, updated_at, last_login_at " +
                         "FROM users WHERE id = ? LIMIT 1",
                 rowMapper(), id.value());
@@ -47,19 +46,19 @@ class UserJdbcRepository implements UserRepository {
 
     @Override
     public User save(User user) {
-        UUID tenantUuid = user.tenantId() == null ? null : user.tenantId().value();
+        UUID orgUuid = user.organizationId() == null ? null : user.organizationId().value();
         UUID createdByUuid = user.createdBy() == null ? null : user.createdBy().value();
         Timestamp lastLoginTs = user.lastLoginAt() == null ? null : Timestamp.from(user.lastLoginAt());
 
         int updated = jdbc.update(
                 "UPDATE users SET email = ?, password_hash = ?, role = ?, status = ?, " +
-                        "tenant_id = ?, created_by = ?, updated_at = ?, last_login_at = ? " +
+                        "organization_id = ?, created_by = ?, updated_at = ?, last_login_at = ? " +
                         "WHERE id = ?",
                 user.email(),
                 user.passwordHash(),
                 user.role().name(),
                 user.status().name(),
-                tenantUuid,
+                orgUuid,
                 createdByUuid,
                 Timestamp.from(user.updatedAt()),
                 lastLoginTs,
@@ -67,7 +66,7 @@ class UserJdbcRepository implements UserRepository {
 
         if (updated == 0) {
             jdbc.update(
-                    "INSERT INTO users (id, email, password_hash, role, status, tenant_id, " +
+                    "INSERT INTO users (id, email, password_hash, role, status, organization_id, " +
                             "created_by, created_at, updated_at, last_login_at) " +
                             "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                     user.id().value(),
@@ -75,7 +74,7 @@ class UserJdbcRepository implements UserRepository {
                     user.passwordHash(),
                     user.role().name(),
                     user.status().name(),
-                    tenantUuid,
+                    orgUuid,
                     createdByUuid,
                     Timestamp.from(user.createdAt()),
                     Timestamp.from(user.updatedAt()),
@@ -94,7 +93,7 @@ class UserJdbcRepository implements UserRepository {
 
     private RowMapper<User> rowMapper() {
         return (rs, rowNum) -> {
-            UUID tenantUuid = rs.getObject("tenant_id", UUID.class);
+            UUID orgUuid = rs.getObject("organization_id", UUID.class);
             UUID createdByUuid = rs.getObject("created_by", UUID.class);
             Timestamp lastLogin = rs.getTimestamp("last_login_at");
             return new User(
@@ -103,7 +102,7 @@ class UserJdbcRepository implements UserRepository {
                     rs.getString("password_hash"),
                     Role.valueOf(rs.getString("role")),
                     UserStatus.valueOf(rs.getString("status")),
-                    tenantUuid == null ? null : TenantId.of(tenantUuid),
+                    orgUuid == null ? null : OrganizationId.of(orgUuid),
                     createdByUuid == null ? null : UserId.of(createdByUuid),
                     rs.getTimestamp("created_at").toInstant(),
                     rs.getTimestamp("updated_at").toInstant(),

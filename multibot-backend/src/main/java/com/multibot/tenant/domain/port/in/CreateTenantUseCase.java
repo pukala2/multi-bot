@@ -1,13 +1,12 @@
 package com.multibot.tenant.domain.port.in;
 
+import com.multibot.shared.organization.OrganizationId;
 import com.multibot.tenant.domain.model.Tenant;
-import com.multibot.tenant.domain.model.TenantPlan;
 
 public interface CreateTenantUseCase {
 
     /**
-     * Tworzy nowego tenanta. Slug generowany z nazwy (unikalny).
-     * companyName + nip opcjonalne (nullable).
+     * Tworzy nowego bota (tenanta) w obrebie organizacji. Slug generowany z nazwy (unikalny).
      */
-    Tenant create(String name, TenantPlan plan, String companyName, String nip);
+    Tenant create(OrganizationId organizationId, String name);
 }

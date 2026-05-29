@@ -38,9 +38,8 @@ class TenantJpaEntity {
     @Column(nullable = false, unique = true)
     private String slug;
 
-    @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
-    private TenantPlanValue plan;
+    @Column(name = "organization_id", nullable = false)
+    private UUID organizationId;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -54,19 +53,11 @@ class TenantJpaEntity {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
-    @Column(name = "company_name")
-    private String companyName;
-
-    @Column(name = "nip")
-    private String nip;
-
     @Column(name = "created_by")
     private UUID createdBy;
 
     @Column(name = "updated_by")
     private UUID updatedBy;
-
-    enum TenantPlanValue {FREE, BASIC, PRO, ENTERPRISE}
 
     enum TenantStatusValue {ACTIVE, SUSPENDED}
 }

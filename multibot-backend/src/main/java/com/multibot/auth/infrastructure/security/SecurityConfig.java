@@ -106,7 +106,7 @@ class SecurityConfig {
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
                 .authorizeHttpRequests(a -> a
                         // Public
-                        .requestMatchers("/actuator/health", "/actuator/info").permitAll()
+                        .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
                         .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/login").permitAll()
                         .requestMatchers(HttpMethod.POST, "/api/auth/logout").permitAll()
@@ -117,6 +117,8 @@ class SecurityConfig {
                         .requestMatchers(HttpMethod.POST, "/api/chat/sessions/*/messages").permitAll()
                         // Super admin — tylko rola SUPER_ADMIN
                         .requestMatchers("/api/super-admin/**").hasRole("SUPER_ADMIN")
+                        // Self-serve zarządzanie botami — tylko OWNER (super admin używa /api/super-admin)
+                        .requestMatchers("/api/bots/**").hasRole("OWNER")
                         // Reszta tylko zalogowani (lista sesji, historia, dokumenty, billing, ...)
                         .anyRequest().authenticated())
                 .exceptionHandling(e -> e.authenticationEntryPoint(jsonAuthEntryPoint))

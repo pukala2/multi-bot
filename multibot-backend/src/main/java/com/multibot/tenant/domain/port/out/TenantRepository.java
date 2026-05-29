@@ -1,5 +1,6 @@
 package com.multibot.tenant.domain.port.out;
 
+import com.multibot.shared.organization.OrganizationId;
 import com.multibot.shared.tenant.TenantId;
 import com.multibot.tenant.domain.model.Tenant;
 import com.multibot.tenant.domain.model.TenantSlug;
@@ -14,6 +15,8 @@ public interface TenantRepository {
     Optional<Tenant> findBySlug(TenantSlug slug);
 
     List<Tenant> findAll();
+
+    List<Tenant> findByOrganizationId(OrganizationId organizationId);
 
     Tenant save(Tenant tenant);
 

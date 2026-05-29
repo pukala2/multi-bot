@@ -1,5 +1,6 @@
 package com.multibot.tenant.infrastructure.persistence;
 
+import com.multibot.shared.organization.OrganizationId;
 import com.multibot.shared.tenant.TenantId;
 import com.multibot.tenant.domain.model.Tenant;
 import com.multibot.tenant.domain.model.TenantSlug;
@@ -33,6 +34,13 @@ class TenantRepositoryAdapter implements TenantRepository {
     @Override
     public List<Tenant> findAll() {
         return jpaRepository.findAll().stream()
+                .map(TenantEntityMapper::toDomain)
+                .toList();
+    }
+
+    @Override
+    public List<Tenant> findByOrganizationId(OrganizationId organizationId) {
+        return jpaRepository.findByOrganizationIdOrderByNameAsc(organizationId.value()).stream()
                 .map(TenantEntityMapper::toDomain)
                 .toList();
     }

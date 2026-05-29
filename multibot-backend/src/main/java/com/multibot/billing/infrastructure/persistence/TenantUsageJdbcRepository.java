@@ -40,6 +40,20 @@ class TenantUsageJdbcRepository implements TenantUsageRepository {
     }
 
     @Override
+    public long sumUserMessagesForOrgOf(TenantId tenantId, LocalDate periodMonth) {
+        Long sum = jdbc.queryForObject("""
+                SELECT COALESCE(SUM(tu.user_messages), 0)
+                FROM tenants sibling
+                LEFT JOIN tenant_usage tu
+                       ON tu.tenant_id = sibling.id AND tu.period_month = ?
+                WHERE sibling.organization_id = (SELECT organization_id FROM tenants WHERE id = ?)
+                """,
+                Long.class,
+                Date.valueOf(periodMonth), tenantId.value());
+        return sum == null ? 0L : sum;
+    }
+
+    @Override
     public long incrementUserMessages(TenantId tenantId, LocalDate periodMonth) {
         // UPSERT z atomowym +1, RETURNING daje nowa wartosc
         Long newValue = jdbc.queryForObject("""
