@@ -20,20 +20,22 @@ import java.util.UUID;
 /**
  * TenantResolver wlaczany gdy multibot.tenancy.mode=auth. Zwraca AKTYWNEGO bota (tenant).
  * Kolejnosc:
- *   1. impersonacja z sesji ("impersonatedTenantId") — super admin "wejdz jako klient" (Faza D).
- *   2. aktywny bot wybrany przez zalogowanego usera ("activeBotTenantId") — ustawiany przy
+ *   1. aktywny bot wybrany przez zalogowanego usera ("activeBotTenantId") — ustawiany przy
  *      loginie / przelaczniku botow (juz po walidacji ze bot nalezy do organizacji usera).
- *   3. fallback: zalogowany user z organizacja ale bez wybranego bota (np. sesja sprzed deployu)
+ *   2. fallback: zalogowany user z organizacja ale bez wybranego bota (np. sesja sprzed deployu)
  *      -> auto-wybor pierwszego bota i zapis w sesji.
- *   4. tenant widgeta wrzucony przez WidgetGuardFilter (anonim, po walidacji key+origin+limit).
- *   5. brak -> TenantContext.get() poleci bledem (zamierzone).
+ *   3. tenant widgeta wrzucony przez WidgetGuardFilter (anonim, po walidacji key+origin+limit).
+ *   4. brak -> TenantContext.get() poleci bledem (zamierzone).
+ *
+ * Impersonacja super admina ("wejdz jako klient") — do dodania w przyszlosci RAZEM z endpointem
+ * ustawiajacym atrybut + guardem SUPER_ADMIN + audytem. Wczesniej byla tu martwa galaz (czytala
+ * atrybut, ktorego nic nie ustawialo) — usunieta, zeby nie byla latentna dziura.
  */
 @Component
 @ConditionalOnProperty(name = "multibot.tenancy.mode", havingValue = "auth")
 public class AuthenticatedTenantResolver implements TenantResolver {
 
     public static final String ACTIVE_BOT_ATTR = "activeBotTenantId";
-    private static final String IMPERSONATION_ATTR = "impersonatedTenantId";
 
     private final ListTenantsUseCase listTenants;
 
@@ -45,10 +47,6 @@ public class AuthenticatedTenantResolver implements TenantResolver {
     public Optional<TenantId> resolve(HttpServletRequest request) {
         HttpSession session = request.getSession(false);
         if (session != null) {
-            Object impersonated = session.getAttribute(IMPERSONATION_ATTR);
-            if (impersonated instanceof UUID uuid) {
-                return Optional.of(TenantId.of(uuid));
-            }
             Object activeBot = session.getAttribute(ACTIVE_BOT_ATTR);
             if (activeBot instanceof UUID uuid) {
                 return Optional.of(TenantId.of(uuid));

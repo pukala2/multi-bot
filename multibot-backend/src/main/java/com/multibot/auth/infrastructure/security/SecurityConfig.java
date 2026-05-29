@@ -2,10 +2,12 @@ package com.multibot.auth.infrastructure.security;
 
 import com.multibot.security.infrastructure.WidgetGuardFilter;
 import com.multibot.tenancy.filter.TenantContextFilter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.servlet.FilterRegistrationBean;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.config.annotation.authentication.configuration.AuthenticationConfiguration;
 import org.springframework.security.web.access.intercept.AuthorizationFilter;
@@ -30,9 +32,12 @@ import java.util.List;
 class SecurityConfig {
 
     private final JsonAuthEntryPoint jsonAuthEntryPoint;
+    private final List<String> panelOrigins;
 
-    SecurityConfig(JsonAuthEntryPoint jsonAuthEntryPoint) {
+    SecurityConfig(JsonAuthEntryPoint jsonAuthEntryPoint,
+                   @Value("${multibot.cors.allowed-origins}") List<String> panelOrigins) {
         this.jsonAuthEntryPoint = jsonAuthEntryPoint;
+        this.panelOrigins = panelOrigins;
     }
 
     @Bean
@@ -59,36 +64,44 @@ class SecurityConfig {
     }
 
     /**
-     * CORS dla CALEGO /api/**.
-     *
-     * Za reverse proxy (Caddy) backend widzi inny host niz Origin przegladarki, wiec Spring
-     * traktuje KAZDY request z naglowkiem Origin (browser wysyla go na POST) jako cross-origin.
-     * Bez configu dla danej sciezki Spring odrzuca "Invalid CORS request" (403) — to blokowalo
-     * logowanie admina przez przegladarke.
-     *
-     * allowedOriginPatterns("*") + allowCredentials(true): Spring odbija faktyczny Origin
-     * (nie literalna gwiazdke), wiec cookies admina dzialaja. Bezpieczenstwo nadal trzymaja:
-     * CSRF token (X-XSRF-TOKEN, nieczytelny cross-origin), SameSite=Lax na cookie sesji,
-     * oraz WidgetGuardFilter (per-key + origin whitelist) na endpointach widgeta.
+     * Dwie polityki CORS:
+     *  - Panel ("/api/**" z cookie sesji): TYLKO zaufane originy z konfiguracji
+     *    (multibot.cors.allowed-origins). allowCredentials(true) wymaga jawnej listy — gwiazdka
+     *    z credentials byłaby dziurą (dowolna strona czytałaby dane zalogowanego usera).
+     *    Za reverse proxy (Caddy) backend widzi inny host niż Origin, więc nawet same-origin panel
+     *    musi być na liście.
+     *  - Widget + chat (wołane z domen klientów): originy "*", ale BEZ credentials — autoryzacja
+     *    idzie kluczem widgetu (WidgetGuardFilter), nie cookie. Bardziej specyficzne wzorce muszą
+     *    być zarejestrowane PRZED "/api/**".
      */
     @Bean
     CorsConfigurationSource corsConfigurationSource() {
-        CorsConfiguration cors = new CorsConfiguration();
-        cors.setAllowedOriginPatterns(List.of("*"));
-        cors.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        cors.setAllowedHeaders(List.of("*"));
-        cors.setAllowCredentials(true);
-        cors.setMaxAge(3600L);
+        CorsConfiguration panel = new CorsConfiguration();
+        panel.setAllowedOrigins(panelOrigins);
+        panel.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
+        panel.setAllowedHeaders(List.of("*"));
+        panel.setAllowCredentials(true);
+        panel.setMaxAge(3600L);
+
+        CorsConfiguration widget = new CorsConfiguration();
+        widget.setAllowedOriginPatterns(List.of("*"));
+        widget.setAllowedMethods(List.of("GET", "POST", "OPTIONS"));
+        widget.setAllowedHeaders(List.of("*"));
+        widget.setAllowCredentials(false);
+        widget.setMaxAge(3600L);
 
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
-        source.registerCorsConfiguration("/api/**", cors);
+        source.registerCorsConfiguration("/api/widget/**", widget);
+        source.registerCorsConfiguration("/api/chat/**", widget);
+        source.registerCorsConfiguration("/api/**", panel);
         return source;
     }
 
     @Bean
     SecurityFilterChain securityFilterChain(HttpSecurity http,
                                             TenantContextFilter tenantContextFilter,
-                                            WidgetGuardFilter widgetGuardFilter) throws Exception {
+                                            WidgetGuardFilter widgetGuardFilter,
+                                            LoginRateLimitFilter loginRateLimitFilter) throws Exception {
         CookieCsrfTokenRepository csrfRepo = CookieCsrfTokenRepository.withHttpOnlyFalse();
         csrfRepo.setCookieName("XSRF-TOKEN");
         CsrfTokenRequestAttributeHandler csrfHandler = new CsrfTokenRequestAttributeHandler();
@@ -104,6 +117,17 @@ class SecurityConfig {
                         .ignoringRequestMatchers("/api/widget/**", "/api/chat/**", "/actuator/**"))
                 .sessionManagement(s -> s
                         .sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
+                .headers(h -> h
+                        // Domyślne (nosniff, X-Frame-Options DENY) zostają; dokładamy HSTS, CSP, Referrer-Policy.
+                        .httpStrictTransportSecurity(hsts -> hsts
+                                .includeSubDomains(true)
+                                .maxAgeInSeconds(31_536_000))
+                        .referrerPolicy(r -> r.policy(
+                                ReferrerPolicyHeaderWriter.ReferrerPolicy.STRICT_ORIGIN_WHEN_CROSS_ORIGIN))
+                        // API zwraca JSON (+ Swagger w dev). Restrykcyjnie, ale bez blokowania swagger-ui.
+                        .contentSecurityPolicy(csp -> csp.policyDirectives(
+                                "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; "
+                                + "script-src 'self' 'unsafe-inline'; frame-ancestors 'none'; base-uri 'self'")))
                 .authorizeHttpRequests(a -> a
                         // Public
                         .requestMatchers("/actuator/health", "/actuator/health/**", "/actuator/info").permitAll()
@@ -125,6 +149,8 @@ class SecurityConfig {
                 .formLogin(AbstractHttpConfigurer::disable)
                 .httpBasic(AbstractHttpConfigurer::disable)
                 .logout(AbstractHttpConfigurer::disable)        // wlasny /api/auth/logout w controllerze
+                // Throttling logowania PRZED CSRF/auth — chroni przed brute-force.
+                .addFilterBefore(loginRateLimitFilter, CsrfFilter.class)
                 .addFilterAfter(new CsrfCookieFilter(), CsrfFilter.class)
                 // Guard PO autoryzacji (SecurityContext gotowy), PRZED TenantContextFilter
                 // (guard wrzuca tenant w request attribute ktory czyta resolver).

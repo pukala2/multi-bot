@@ -18,6 +18,14 @@
 
 	# Reszta -> panel admina (SPA, fallback na index.html dla React Router)
 	handle {
+		header {
+			Content-Security-Policy "default-src 'self'; img-src 'self' data:; style-src 'self' 'unsafe-inline'; script-src 'self'; font-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'"
+			X-Content-Type-Options "nosniff"
+			Referrer-Policy "strict-origin-when-cross-origin"
+			Strict-Transport-Security "max-age=31536000; includeSubDomains"
+			X-Frame-Options "DENY"
+			-Server
+		}
 		root * /srv/app
 		try_files {path} /index.html
 		file_server

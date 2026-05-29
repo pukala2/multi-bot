@@ -18,6 +18,11 @@ management:
 multibot:
   tenancy:
     mode: mock
+  security:
+    login:
+      max-per-minute: 100000      # throttling praktycznie wyłączony, by nie psuć innych ITów
+  cors:
+    allowed-origins: http://localhost:5173
 
 server:
   tomcat:

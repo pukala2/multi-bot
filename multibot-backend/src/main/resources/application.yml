@@ -118,10 +118,16 @@ multibot:
     rate-limit:
       per-ip-per-day:        ${MULTIBOT_RATE_LIMIT_IP:80}
       per-session-per-day:   ${MULTIBOT_RATE_LIMIT_SESSION:60}
+    login:
+      max-per-minute:        ${MULTIBOT_LOGIN_MAX_PER_MIN:10}   # throttling logowania per IP
     turnstile:
       enabled:    ${MULTIBOT_TURNSTILE_ENABLED:false}
       site-key:   ${MULTIBOT_TURNSTILE_SITE_KEY:}
       secret-key: ${MULTIBOT_TURNSTILE_SECRET_KEY:}
+
+  # Dozwolone originy panelu (CORS z cookie sesji). W dev = Vite. Prod nadpisuje na domenę panelu.
+  cors:
+    allowed-origins: ${MULTIBOT_CORS_ALLOWED_ORIGINS:http://localhost:5173,http://localhost:8080}
 
   file:
     storage:

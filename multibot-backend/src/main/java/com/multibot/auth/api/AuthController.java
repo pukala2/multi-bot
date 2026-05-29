@@ -63,6 +63,11 @@ class AuthController implements AuthApi {
         Authentication authentication = authenticationManager.authenticate(
                 new UsernamePasswordAuthenticationToken(loginRequest.getEmail(), loginRequest.getPassword()));
 
+        // Ochrona przed session fixation: rotacja id istniejącej sesji (np. z prime'a CSRF) po auth.
+        if (httpRequest.getSession(false) != null) {
+            httpRequest.changeSessionId();
+        }
+
         SecurityContext context = SecurityContextHolder.createEmptyContext();
         context.setAuthentication(authentication);
         SecurityContextHolder.setContext(context);

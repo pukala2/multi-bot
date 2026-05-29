@@ -9,6 +9,22 @@ spring:
   jpa:
     show-sql: false
 
+server:
+  # Caddy terminuje TLS i ustawia X-Forwarded-*; framework => request.isSecure()=true za proxy,
+  # dzięki czemu cookies sesji/XSRF lecą jako Secure i Spring Security emituje HSTS.
+  forward-headers-strategy: framework
+  servlet:
+    session:
+      cookie:
+        secure: true
+        same-site: lax
+        http-only: true
+
+multibot:
+  # Origin panelu (CORS z cookie). Override przez MULTIBOT_CORS_ALLOWED_ORIGINS w deploy/.env.
+  cors:
+    allowed-origins: ${MULTIBOT_CORS_ALLOWED_ORIGINS:https://multibot-test.duckdns.org}
+
 # Swagger / API docs wylaczone na produkcji (publiczny serwer)
 springdoc:
   swagger-ui:
