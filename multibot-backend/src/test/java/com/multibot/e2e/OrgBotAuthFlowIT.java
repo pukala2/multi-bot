@@ -13,6 +13,8 @@ import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.hasItem;
+import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.hamcrest.Matchers.nullValue;
 import static org.hamcrest.Matchers.startsWith;
@@ -209,6 +211,43 @@ class OrgBotAuthFlowIT extends IntegrationTestBase {
                 .body("{\"name\":\"Druga strona\"}")
                 .when().post("/api/bots").then()
                 .statusCode(409);
+    }
+
+    @Test
+    @DisplayName("Dozwolone domeny widgetu: PUT normalizuje URL->origin, GET zwraca zapisane")
+    void widgetAllowedOrigins_normalizedAndPersisted() {
+        Sess owner = loginAs(OWNER_EMAIL, OWNER_PASS);
+
+        given().filter(owner.cookies()).header("X-XSRF-TOKEN", owner.csrf()).contentType(ContentType.JSON)
+                .body("{\"origins\":[\"https://example.com\",\"example.org/sklep\"]}")
+                .when().put("/api/admin/widget/origins").then()
+                .statusCode(200)
+                .body("origins", hasItems("https://example.com", "https://example.org"));
+
+        given().filter(owner.cookies()).when().get("/api/admin/widget/origins").then()
+                .statusCode(200)
+                .body("origins", hasItems("https://example.com", "https://example.org"));
+    }
+
+    @Test
+    @DisplayName("Utworzenie org z firstBotUrl ustawia allowed_origins pierwszego bota")
+    void provisionWithBotUrl_setsAllowedOrigins() {
+        String suffix = UUID.randomUUID().toString().substring(0, 8);
+        String ownerEmail = "owner-url-" + suffix + "@test.local";
+
+        Sess sa = loginAs(SA_EMAIL, SA_PASS);
+        String pass = given().filter(sa.cookies()).header("X-XSRF-TOKEN", sa.csrf()).contentType(ContentType.JSON)
+                .body("""
+                        {"name":"Org URL %s","ownerEmail":"%s","plan":"PRO","firstBotName":"Bot A","firstBotUrl":"silesiaszymanow.pl"}
+                        """.formatted(suffix, ownerEmail))
+                .when().post("/api/super-admin/organizations").then()
+                .statusCode(201).extract().path("generatedPassword");
+
+        // owner loguje sie -> aktywny bot = Bot A (z firstBotUrl) -> origins ustawione (znormalizowane)
+        Sess owner = loginAs(ownerEmail, pass);
+        given().filter(owner.cookies()).when().get("/api/admin/widget/origins").then()
+                .statusCode(200)
+                .body("origins", hasItem("https://silesiaszymanow.pl"));
     }
 
     // --- helpers ---

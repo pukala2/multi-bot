@@ -24,4 +24,10 @@ public interface WidgetRepository {
 
     /** Lista dozwolonych origins dla danego klucza widgeta. Pusta lista = bez ograniczen (dev). */
     List<String> findAllowedOrigins(String key);
+
+    /** Dozwolone origins aktywnego klucza danego tenanta (bota). */
+    List<String> findAllowedOriginsByTenant(UUID tenantId);
+
+    /** Ustawia dozwolone origins na aktywnym kluczu danego tenanta (bota). */
+    void updateAllowedOriginsByTenant(UUID tenantId, List<String> origins);
 }

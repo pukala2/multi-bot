@@ -10,12 +10,14 @@ import { cn } from '@/lib/cn';
 export function AddBotDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (o: boolean) => void }) {
   const addBot = useAddOwnerBot();
   const [name, setName] = useState('');
+  const [url, setUrl] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [result, setResult] = useState<AddedBot | null>(null);
 
   function close(o: boolean) {
     if (!o) {
       setName('');
+      setUrl('');
       setError(null);
       setResult(null);
     }
@@ -26,7 +28,7 @@ export function AddBotDialog({ open, onOpenChange }: { open: boolean; onOpenChan
     e.preventDefault();
     setError(null);
     try {
-      const r = await addBot.mutateAsync(name);
+      const r = await addBot.mutateAsync({ name, url: url.trim() || undefined });
       setResult(r);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Nie udało się dodać bota');
@@ -61,6 +63,11 @@ export function AddBotDialog({ open, onOpenChange }: { open: boolean; onOpenChan
             <div className="space-y-1.5">
               <label className="text-[12px] text-text-muted">Nazwa bota *</label>
               <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Sklep meblowy" required autoFocus />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-[12px] text-text-muted">Adres strony (opcj.)</label>
+              <Input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://twojadomena.pl" />
+              <p className="text-[11px] text-text-dim">Zablokuje widget do tej domeny. Możesz zmienić później w zakładce Widget.</p>
             </div>
             {error && (
               <div className="text-[12px] text-error bg-error/10 border border-error/20 rounded-md px-3 py-2">{error}</div>

@@ -34,7 +34,7 @@ export function useBotLimit(enabled = true) {
 export function useAddOwnerBot() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async (name: string): Promise<AddedBot> => {
+    mutationFn: async ({ name, url }: { name: string; url?: string }): Promise<AddedBot> => {
       const csrf = readCookie('XSRF-TOKEN');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (csrf) headers['X-XSRF-TOKEN'] = csrf;
@@ -42,7 +42,7 @@ export function useAddOwnerBot() {
         method: 'POST',
         headers,
         credentials: 'same-origin',
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, url: url || undefined }),
       });
       if (!r.ok) {
         let msg = `HTTP ${r.status}`;

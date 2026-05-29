@@ -111,6 +111,33 @@ class WidgetJdbcRepository implements WidgetRepository {
         }
     }
 
+    @Override
+    public List<String> findAllowedOriginsByTenant(UUID tenantId) {
+        try {
+            String[] origins = jdbc.queryForObject(
+                    "SELECT allowed_origins FROM widget_keys WHERE tenant_id = ? AND is_active = true LIMIT 1",
+                    (rs, rowNum) -> {
+                        Array array = rs.getArray("allowed_origins");
+                        return array == null ? new String[0] : (String[]) array.getArray();
+                    },
+                    tenantId);
+            return origins == null ? List.of() : Arrays.asList(origins);
+        } catch (EmptyResultDataAccessException e) {
+            return List.of();
+        }
+    }
+
+    @Override
+    public void updateAllowedOriginsByTenant(UUID tenantId, List<String> origins) {
+        jdbc.update(con -> {
+            var ps = con.prepareStatement(
+                    "UPDATE widget_keys SET allowed_origins = ? WHERE tenant_id = ? AND is_active = true");
+            ps.setArray(1, con.createArrayOf("text", origins.toArray()));
+            ps.setObject(2, tenantId);
+            return ps;
+        });
+    }
+
     private WidgetSettings mapSettings(ResultSet rs, int rowNum) throws SQLException {
         return new WidgetSettings(
                 rs.getString("accent_color"),

@@ -49,7 +49,7 @@ class BotController {
     ResponseEntity<Map<String, Object>> addBot(@AuthenticationPrincipal MultibotUserDetails me,
                                                @Valid @RequestBody AddBotRequest req) {
         OrganizationId org = requireOrg(me);
-        AddBotResult r = ownerBots.addBot(org, req.name());
+        AddBotResult r = ownerBots.addBot(org, req.name(), req.url());
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("botId", r.botId().value().toString());
@@ -67,7 +67,8 @@ class BotController {
     }
 
     record AddBotRequest(
-            @NotBlank String name
+            @NotBlank String name,
+            String url
     ) {
     }
 }

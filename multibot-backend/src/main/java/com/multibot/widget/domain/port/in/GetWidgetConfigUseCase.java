@@ -23,6 +23,9 @@ public interface GetWidgetConfigUseCase {
     /** Lista dozwolonych originów dla danego klucza (do zarzadzania w panelu). */
     List<String> getAllowedOrigins(String key);
 
+    /** Dozwolone origins aktywnego bota (z TenantContext) — do edycji w panelu Widget. */
+    List<String> getAllowedOriginsForCurrentTenant();
+
     /**
      * Walidacja klucza widgeta dla zadania anonimowego (chat).
      * Zwraca tenant jezeli: klucz aktywny ORAZ origin dozwolony.

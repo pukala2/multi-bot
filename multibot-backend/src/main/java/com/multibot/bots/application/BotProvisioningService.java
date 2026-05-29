@@ -11,7 +11,10 @@ import com.multibot.tenant.domain.model.Tenant;
 import com.multibot.tenant.domain.port.in.CreateTenantUseCase;
 import com.multibot.widget.domain.model.WidgetConfig;
 import com.multibot.widget.domain.port.in.GetWidgetConfigUseCase;
+import com.multibot.widget.domain.port.in.UpdateWidgetSettingsUseCase;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 /**
  * Orkiestracja provisioningu pojedynczego bota. Wersja i widget tworzone w kontekscie nowego
@@ -24,19 +27,22 @@ class BotProvisioningService implements AddBotUseCase {
     private final CreateVersionUseCase createVersion;
     private final ActivateVersionUseCase activateVersion;
     private final GetWidgetConfigUseCase widgetConfig;
+    private final UpdateWidgetSettingsUseCase widgetSettings;
 
     BotProvisioningService(CreateTenantUseCase createTenant,
                            CreateVersionUseCase createVersion,
                            ActivateVersionUseCase activateVersion,
-                           GetWidgetConfigUseCase widgetConfig) {
+                           GetWidgetConfigUseCase widgetConfig,
+                           UpdateWidgetSettingsUseCase widgetSettings) {
         this.createTenant = createTenant;
         this.createVersion = createVersion;
         this.activateVersion = activateVersion;
         this.widgetConfig = widgetConfig;
+        this.widgetSettings = widgetSettings;
     }
 
     @Override
-    public AddBotResult addBot(OrganizationId organizationId, String botName) {
+    public AddBotResult addBot(OrganizationId organizationId, String botName, String siteUrl) {
         Tenant tenant = createTenant.create(organizationId, botName);
         TenantId tid = tenant.id();
 
@@ -47,6 +53,9 @@ class BotProvisioningService implements AddBotUseCase {
             activateVersion.activate(v.id());
             WidgetConfig wc = widgetConfig.getForCurrentTenant();   // provisionuje settings + key
             widgetKey = wc.key();
+            if (siteUrl != null && !siteUrl.isBlank()) {
+                widgetSettings.updateAllowedOriginsForCurrentTenant(List.of(siteUrl));
+            }
         } finally {
             TenantContext.clear();
         }

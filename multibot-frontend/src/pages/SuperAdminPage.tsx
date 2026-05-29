@@ -37,15 +37,17 @@ export function SuperAdminPage() {
   const [companyName, setCompanyName] = useState('');
   const [nip, setNip] = useState('');
   const [firstBotName, setFirstBotName] = useState('');
+  const [firstBotUrl, setFirstBotUrl] = useState('');
   const [createError, setCreateError] = useState<string | null>(null);
 
   // add-bot form
   const [botName, setBotName] = useState('');
+  const [botUrl, setBotUrl] = useState('');
   const [addBotError, setAddBotError] = useState<string | null>(null);
 
   function resetCreateForm() {
     setName(''); setOwnerEmail(''); setPlan('FREE'); setCompanyName(''); setNip('');
-    setFirstBotName(''); setCreateError(null);
+    setFirstBotName(''); setFirstBotUrl(''); setCreateError(null);
   }
 
   async function handleCreate(e: FormEvent) {
@@ -57,6 +59,7 @@ export function SuperAdminPage() {
         companyName: companyName || undefined,
         nip: nip || undefined,
         firstBotName: firstBotName || undefined,
+        firstBotUrl: firstBotUrl || undefined,
       });
       setCreateOpen(false);
       resetCreateForm();
@@ -71,9 +74,10 @@ export function SuperAdminPage() {
     if (!addBotFor) return;
     setAddBotError(null);
     try {
-      const r = await addBot.mutateAsync({ organizationId: addBotFor.id, name: botName });
+      const r = await addBot.mutateAsync({ organizationId: addBotFor.id, name: botName, url: botUrl.trim() || undefined });
       setAddBotFor(null);
       setBotName('');
+      setBotUrl('');
       setAddBotResult(r);
     } catch (err) {
       setAddBotError(err instanceof Error ? err.message : 'Nie udało się dodać bota');
@@ -102,7 +106,7 @@ export function SuperAdminPage() {
       ) : (
         <div className="space-y-3">
           {orgs.data.map((org) => (
-            <OrganizationCard key={org.id} org={org} onAddBot={() => { setBotName(''); setAddBotError(null); setAddBotFor(org); }} />
+            <OrganizationCard key={org.id} org={org} onAddBot={() => { setBotName(''); setBotUrl(''); setAddBotError(null); setAddBotFor(org); }} />
           ))}
         </div>
       )}
@@ -136,6 +140,9 @@ export function SuperAdminPage() {
                 <Input value={firstBotName} onChange={(e) => setFirstBotName(e.target.value)} placeholder="domyślnie = nazwa klienta" />
               </Field>
             </div>
+            <Field label="Adres strony pierwszego bota (opcj.)">
+              <Input value={firstBotUrl} onChange={(e) => setFirstBotUrl(e.target.value)} placeholder="https://twojadomena.pl" />
+            </Field>
             <div className="grid grid-cols-2 gap-3">
               <Field label="Nazwa firmy (opcj.)">
                 <Input value={companyName} onChange={(e) => setCompanyName(e.target.value)} placeholder="Firma Sp. z o.o." />
@@ -168,6 +175,9 @@ export function SuperAdminPage() {
           <DialogBody className="space-y-3">
             <Field label="Nazwa bota *">
               <Input value={botName} onChange={(e) => setBotName(e.target.value)} placeholder="Sklep meblowy" required autoFocus />
+            </Field>
+            <Field label="Adres strony (opcj.)">
+              <Input value={botUrl} onChange={(e) => setBotUrl(e.target.value)} placeholder="https://twojadomena.pl" />
             </Field>
             {addBotError && (
               <div className="text-[12px] text-error bg-error/10 border border-error/20 rounded-md px-3 py-2">{addBotError}</div>

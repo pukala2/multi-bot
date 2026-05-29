@@ -29,6 +29,7 @@ export interface CreateOrganizationInput {
   companyName?: string;
   nip?: string;
   firstBotName?: string;
+  firstBotUrl?: string;
 }
 
 export interface ProvisionResult {
@@ -99,12 +100,12 @@ export function useCreateOrganization() {
 export function useAddBot() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ organizationId, name }: { organizationId: string; name: string }): Promise<AddBotResult> => {
+    mutationFn: async ({ organizationId, name, url }: { organizationId: string; name: string; url?: string }): Promise<AddBotResult> => {
       const r = await fetch(`/api/super-admin/organizations/${organizationId}/bots`, {
         method: 'POST',
         headers: mutationHeaders(),
         credentials: 'same-origin',
-        body: JSON.stringify({ name }),
+        body: JSON.stringify({ name, url: url || undefined }),
       });
       if (!r.ok) throw new Error(await parseError(r));
       return (await r.json()) as AddBotResult;

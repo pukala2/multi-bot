@@ -60,7 +60,8 @@ class SuperAdminController {
     @PostMapping("/organizations")
     ResponseEntity<Map<String, Object>> createOrganization(@Valid @RequestBody CreateOrganizationRequest req) {
         ProvisionResult r = provisionOrganization.provision(new ProvisionCommand(
-                req.name(), req.ownerEmail(), req.plan(), req.companyName(), req.nip(), req.firstBotName()));
+                req.name(), req.ownerEmail(), req.plan(), req.companyName(), req.nip(),
+                req.firstBotName(), req.firstBotUrl()));
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("organizationId", r.organizationId().value().toString());
@@ -76,7 +77,7 @@ class SuperAdminController {
     @PostMapping("/organizations/{orgId}/bots")
     ResponseEntity<Map<String, Object>> addBotToOrganization(@PathVariable String orgId,
                                                              @Valid @RequestBody AddBotRequest req) {
-        AddBotResult r = addBot.addBot(OrganizationId.of(orgId), req.name());
+        AddBotResult r = addBot.addBot(OrganizationId.of(orgId), req.name(), req.url());
 
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("botId", r.botId().value().toString());
@@ -136,12 +137,14 @@ class SuperAdminController {
             @NotBlank String plan,
             String companyName,
             String nip,
-            String firstBotName
+            String firstBotName,
+            String firstBotUrl
     ) {
     }
 
     record AddBotRequest(
-            @NotBlank String name
+            @NotBlank String name,
+            String url
     ) {
     }
 }

@@ -45,7 +45,7 @@ class ProvisionOrganizationService implements ProvisionOrganizationUseCase {
         String botName = (cmd.firstBotName() == null || cmd.firstBotName().isBlank())
                 ? cmd.name()
                 : cmd.firstBotName();
-        AddBotResult bot = addBot.addBot(org.id(), botName);
+        AddBotResult bot = addBot.addBot(org.id(), botName, cmd.firstBotUrl());
 
         return new ProvisionResult(org.id(), org.name(), cmd.ownerEmail(), rawPassword,
                 bot.botId(), bot.botName(), bot.widgetKey());

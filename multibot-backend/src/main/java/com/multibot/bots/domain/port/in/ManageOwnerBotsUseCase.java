@@ -9,6 +9,6 @@ public interface ManageOwnerBotsUseCase {
     /** Aktualny stan limitu botow dla organizacji (do wyswietlenia + bramki przycisku). */
     BotLimitDecision currentLimit(OrganizationId organizationId);
 
-    /** Self-serve: owner dodaje bota w swojej organizacji. Egzekwuje limit (ConflictException gdy przekroczony). */
-    AddBotResult addBot(OrganizationId organizationId, String botName);
+    /** Self-serve: owner dodaje bota w swojej organizacji. Egzekwuje limit (ConflictException gdy przekroczony). siteUrl nullable. */
+    AddBotResult addBot(OrganizationId organizationId, String botName, String siteUrl);
 }

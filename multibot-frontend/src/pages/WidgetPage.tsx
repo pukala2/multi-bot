@@ -7,6 +7,7 @@ import { Card, CardBody, CardHeader, CardTitle, CardSubtitle } from '@/component
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useWidgetAdmin, useUpdateWidgetSettings } from '@/hooks/useWidgetAdmin';
+import { useWidgetOrigins, useUpdateWidgetOrigins } from '@/hooks/useWidgetOrigins';
 import { showApiError } from '@/api/errors';
 import type { components } from '@/api/schema';
 
@@ -31,8 +32,28 @@ function buildSnippet(publicKey: string): string {
 export function WidgetPage() {
   const widget = useWidgetAdmin();
   const updateMutation = useUpdateWidgetSettings();
+  const origins = useWidgetOrigins();
+  const updateOrigins = useUpdateWidgetOrigins();
   const [draft, setDraft] = useState<Settings | null>(null);
+  const [originsText, setOriginsText] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (origins.data && originsText === null) {
+      setOriginsText(origins.data.join('\n'));
+    }
+  }, [origins.data, originsText]);
+
+  const handleSaveOrigins = () => {
+    const list = (originsText ?? '').split('\n').map((s) => s.trim()).filter(Boolean);
+    updateOrigins.mutate(list, {
+      onSuccess: (saved) => {
+        toast.success('Dozwolone domeny zapisane');
+        setOriginsText(saved.join('\n'));
+      },
+      onError: (err) => showApiError(err, 'Nie udało się zapisać domen'),
+    });
+  };
 
   useEffect(() => {
     if (widget.data && !draft) {
@@ -115,6 +136,31 @@ export function WidgetPage() {
               <div className="mt-3 text-[12px] text-text-dim">
                 Klucz publiczny: <span className="mono text-text-muted">{widget.data.publicKey}</span>
               </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div>
+                <CardTitle>Dozwolone domeny</CardTitle>
+                <CardSubtitle>
+                  Widget zadziała tylko na tych domenach (jedna na linię). Pusto = działa wszędzie (tylko do testów).
+                </CardSubtitle>
+              </div>
+              <Button variant="secondary" onClick={handleSaveOrigins} disabled={updateOrigins.isPending || originsText === null}>
+                <Save className="size-3.5" />
+                {updateOrigins.isPending ? 'Zapisuję…' : 'Zapisz domeny'}
+              </Button>
+            </CardHeader>
+            <CardBody>
+              <Textarea
+                value={originsText ?? ''}
+                onChange={(e) => setOriginsText((e.target as HTMLTextAreaElement).value)}
+                rows={3}
+                placeholder={'https://twojadomena.pl\nhttps://www.twojadomena.pl'}
+                className="mono text-[12.5px]"
+                disabled={origins.isPending}
+              />
             </CardBody>
           </Card>
 

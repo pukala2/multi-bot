@@ -11,8 +11,11 @@ import com.multibot.widget.domain.port.out.WidgetRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.net.URI;
 import java.security.SecureRandom;
+import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -82,6 +85,44 @@ class WidgetService implements GetWidgetConfigUseCase, UpdateWidgetSettingsUseCa
         findOrCreateSettings(tenantId);
         repository.updateSettings(tenantId, settings);
         return repository.findSettings(tenantId).orElse(settings);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<String> getAllowedOriginsForCurrentTenant() {
+        return repository.findAllowedOriginsByTenant(TenantContext.get().value());
+    }
+
+    @Override
+    @Transactional
+    public List<String> updateAllowedOriginsForCurrentTenant(List<String> originsOrUrls) {
+        UUID tenantId = TenantContext.get().value();
+        findOrCreateKey(tenantId);   // upewnij sie ze klucz istnieje (cel update'u)
+        List<String> normalized = new ArrayList<>(new LinkedHashSet<>(
+                (originsOrUrls == null ? List.<String>of() : originsOrUrls).stream()
+                        .map(WidgetService::normalizeOrigin)
+                        .filter(o -> o != null)
+                        .toList()));
+        repository.updateAllowedOriginsByTenant(tenantId, normalized);
+        return normalized;
+    }
+
+    /** "silesiaszymanow.pl", "https://silesiaszymanow.pl/sklep" -> "https://silesiaszymanow.pl". */
+    private static String normalizeOrigin(String input) {
+        if (input == null || input.isBlank()) return null;
+        String s = input.trim();
+        if (!s.contains("://")) s = "https://" + s;
+        try {
+            URI uri = URI.create(s);
+            String scheme = uri.getScheme() == null ? null : uri.getScheme().toLowerCase();
+            String host = uri.getHost();
+            if (host == null || host.isBlank() || (!"http".equals(scheme) && !"https".equals(scheme))) {
+                throw new ValidationException("Niepoprawny adres domeny: " + input);
+            }
+            return scheme + "://" + host.toLowerCase() + (uri.getPort() != -1 ? ":" + uri.getPort() : "");
+        } catch (IllegalArgumentException e) {
+            throw new ValidationException("Niepoprawny adres domeny: " + input);
+        }
     }
 
     private WidgetSettings findOrCreateSettings(UUID tenantId) {

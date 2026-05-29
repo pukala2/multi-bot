@@ -32,13 +32,13 @@ class OwnerBotService implements ManageOwnerBotsUseCase {
     }
 
     @Override
-    public AddBotResult addBot(OrganizationId organizationId, String botName) {
+    public AddBotResult addBot(OrganizationId organizationId, String botName, String siteUrl) {
         BotLimitDecision decision = currentLimit(organizationId);
         if (!decision.allowed()) {
             throw new ConflictException(
                     "Osiągnięto limit stron w Twoim planie (" + decision.maxBots()
                             + "). Zmień plan, aby dodać więcej botów.");
         }
-        return botProvisioning.addBot(organizationId, botName);
+        return botProvisioning.addBot(organizationId, botName, siteUrl);
     }
 }
