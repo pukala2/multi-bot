@@ -80,9 +80,9 @@ multibot/
 
 Auth = **sesja (cookie `SESSION`) + CSRF (`XSRF-TOKEN` cookie ↔ nagłówek `X-XSRF-TOKEN`)**. Mutacje wymagają CSRF (poza `/api/widget/**`, `/api/chat/**`, `/actuator/**`).
 
-Część kontrolerów jest **generowana z `docs/api/openapi.yaml`** (contract-first; build generuje interfejsy w `com.multibot.api.generated`, kontroler je implementuje): documents, chat, `admin/widget`, `admin/versions`, `admin/rag-settings`, `admin/analytics`, `admin/stats`, `widget/config`.
+**Wszystkie** kontrolery są **contract-first — generowane z `docs/api/openapi.yaml`** (build generuje interfejsy w `com.multibot.api.generated`, kontroler je implementuje; FE typy: `npm run gen:api` → `src/api/schema.ts`). Dotyczy też endpointów auth/bots/super-admin/billing/widget-origins/turnstile (domknięte 2026-05-29). Błędy walidacji/biznesowe lecą przez `GlobalExceptionHandler` → ProblemDetail (RFC 7807); 401 logowania = `BadCredentialsException`.
 
-Pozostałe to **ręczne kontrolery (POZA openapi.yaml)**:
+Endpointy spoza CRUD-owego rdzenia (warte zapamiętania):
 - `POST /api/auth/login`, `/logout`, `GET /api/auth/me` (zwraca usera + organizationId + activeBot + bots[]), `POST /api/auth/active-bot` (przełącz aktywnego bota; waliduje że bot ∈ org usera)
 - `GET /api/bots/limit`, `POST /api/bots` (self-serve OWNER; egzekwuje max_bots → 409)
 - `GET/POST /api/super-admin/organizations`, `POST /api/super-admin/organizations/{id}/bots` (SUPER_ADMIN; omija limit botów)
@@ -136,9 +136,9 @@ cd multibot-backend
 - **`IntegrationTestBase`** — baza ITów (RestAssured + Testcontainers).
 - **`AuthenticatedIntegrationTestBase`** — dla ITów HTTP wymagających zalogowania (loguje się jako `owner@demo.local`, ustawia globalny RestAssured spec z cookie+CSRF). Stare ITy (Chat/Document/MultiTenant/Indexing) z niej dziedziczą.
 - **`OrgBotAuthFlowIT`** (mode=auth via `@TestPropertySource`) — kluczowy IT modelu: login/me, super admin org+boty, przełączanie aktywnego bota, 403 obcy bot, pooled limit, self-serve 409, dozwolone domeny.
-- Frontend: brak testów automatycznych (weryfikacja przez `npm run build` + ręcznie/curl).
+- Frontend: **Vitest + Testing Library + jsdom** (`npm test` / `npm run test:watch`; setup `src/test/setup.ts`, config w `vite.config.ts`). Pliki `*.test.ts(x)` kolokowane przy źródle. Pokrycie: utilki (`format`/`botColor`/`labels`/`api/errors`/`readCookie`) + krytyczny hook `useSwitchActiveBot` (cache przełączania bota — patrz §8.3). Brak testów E2E panelu — weryfikacja przez `npm run build` (typy) + ręcznie/curl.
 
-Stan na teraz: `mvn verify` zielony.
+Stan na teraz: `mvn verify` zielony (67 unit + 44 IT), `npm test` zielony (32), oba buildy czyste.
 
 ---
 
@@ -198,6 +198,7 @@ Domeny widgetu (`allowed_origins`): owner ustawia na stronie Widget („Dozwolon
 9. **Plany w DB, nie w configu** — super admin (docelowo) edytuje. Liczby (max_bots, limity) zmieniasz w seedzie/migracji billing.
 10. **Sekrety:** `.env` (backend) i `deploy/.env` są gitignored — NIGDY nie commituj. `storage/`, `target/`, `node_modules/`, `dist/` też gitignored.
 11. Shell właściciela wypisuje `Generating CODEARTIFACT_AUTH_TOKEN` przed każdą komendą — to artefakt profilu (firmowy laptop), ignoruj. CodeArtifact NIE jest używany na serwerze (Maven Central działa).
+12. **Contract-first a sesje/principal:** generowane interfejsy `*Api` mają TYLKO parametry z openapi — NIE dostaniesz `HttpServletRequest/Response`, `Authentication`, `@AuthenticationPrincipal` jako argumentu metody. Pobieraj je inaczej: principal/auth z `SecurityContextHolder`, request przez wstrzyknięty (request-scoped) `HttpServletRequest`. `AuthController` zapisuje kontekst bezpieczeństwa do atrybutu sesji (`SPRING_SECURITY_CONTEXT_KEY`) zamiast `SecurityContextRepository.saveContext(req,resp)` — bo `HttpServletResponse` nie jest dostępny. Dodając ręczny endpoint do `openapi.yaml` dodaj `"api"` do `allowedDependencies` modułu (inaczej `ApplicationModulesTest` czerwony).
 
 ---
 
@@ -219,7 +220,7 @@ Domeny widgetu (`allowed_origins`): owner ustawia na stronie Widget („Dozwolon
 - Impersonacja: super admin „wejdź jako klient" (resolver ma już gałąź `impersonatedTenantId`, brak endpointu/UI).
 - Użytkownicy w organizacji: OWNER zaprasza ADMINów, wymuszona zmiana hasła (status `MUST_CHANGE_PASSWORD` istnieje).
 - Turnstile: realne klucze + włączenie (`MULTIBOT_TURNSTILE_*` w prod .env), gdy domena w Cloudflare.
-- Diagramy `docs/diagrams/*.puml` — nieaktualne (stary model tenant=Long/JWT); openapi.yaml nie zawiera ręcznych endpointów (auth/bots/super-admin) — do uzupełnienia.
+- Diagramy `docs/diagrams/*.puml` — nieaktualne (stary model tenant=Long/JWT) — do uzupełnienia. (openapi.yaml domknięty: zawiera już wszystkie endpointy, w tym auth/bots/super-admin/billing/widget-origins/turnstile.)
 - Alerty mailowe 80%/100% limitu, dedup plików po hashu, RODO, samodzielna rejestracja, płatności.
 
 ---
