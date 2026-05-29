@@ -1,6 +1,6 @@
 package com.multibot.indexing;
 
-import com.multibot.integration.IntegrationTestBase;
+import com.multibot.integration.AuthenticatedIntegrationTestBase;
 import io.restassured.RestAssured;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.DisplayName;
@@ -15,7 +15,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
-class IndexingPipelineIT extends IntegrationTestBase {
+class IndexingPipelineIT extends AuthenticatedIntegrationTestBase {
 
     @Autowired
     JdbcTemplate jdbc;

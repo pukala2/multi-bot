@@ -1,6 +1,6 @@
 package com.multibot.chat.api;
 
-import com.multibot.integration.IntegrationTestBase;
+import com.multibot.integration.AuthenticatedIntegrationTestBase;
 import io.restassured.RestAssured;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,7 +18,7 @@ import static org.hamcrest.Matchers.greaterThan;
 import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.notNullValue;
 
-class ChatResourceIT extends IntegrationTestBase {
+class ChatResourceIT extends AuthenticatedIntegrationTestBase {
 
     @Autowired
     JdbcTemplate jdbc;

@@ -1,6 +1,6 @@
 package com.multibot.document.api;
 
-import com.multibot.integration.IntegrationTestBase;
+import com.multibot.integration.AuthenticatedIntegrationTestBase;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,7 +18,7 @@ import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.matchesPattern;
 import static org.hamcrest.Matchers.notNullValue;
 
-class DocumentResourceIT extends IntegrationTestBase {
+class DocumentResourceIT extends AuthenticatedIntegrationTestBase {
 
     @Autowired
     JdbcTemplate jdbc;

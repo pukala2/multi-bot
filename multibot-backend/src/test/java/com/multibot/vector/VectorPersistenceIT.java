@@ -119,11 +119,17 @@ class VectorPersistenceIT extends IntegrationTestBase {
     @DisplayName("Search filters by tenant_id - tenant A cannot see chunks of tenant B")
     void shouldEnforceMultiTenancy() {
         TenantId tenantB = TenantId.of(UUID.fromString("00000000-0000-7000-8000-000000000999"));
+        // organizacja B (id = tenantB dla prostoty) + bot B; plan/firma są na poziomie organizacji
         jdbc.update("""
-                INSERT INTO tenants (id, name, slug, plan, status, created_at, updated_at)
-                VALUES (?, ?, ?, 'FREE', 'ACTIVE', NOW(), NOW())
+                INSERT INTO organizations (id, name, slug, plan, status, created_at, updated_at)
+                VALUES (?, 'Org B', 'org-b-vec', 'FREE', 'ACTIVE', NOW(), NOW())
                 ON CONFLICT (id) DO NOTHING
-                """, tenantB.value(), "Tenant B", "tenant-b");
+                """, tenantB.value());
+        jdbc.update("""
+                INSERT INTO tenants (id, name, slug, organization_id, status, created_at, updated_at)
+                VALUES (?, ?, ?, ?, 'ACTIVE', NOW(), NOW())
+                ON CONFLICT (id) DO NOTHING
+                """, tenantB.value(), "Tenant B", "tenant-b", tenantB.value());
         // Stwórz Wersja 1 ACTIVE dla tenantB (backfill z migracji nie objął tenant utworzonych w teście)
         UUID tenantBVersionId = UUID.randomUUID();
         jdbc.update("""
@@ -239,11 +245,12 @@ class VectorPersistenceIT extends IntegrationTestBase {
                 VALUES (?, ?, 'test.pdf', 'application/pdf', 100, ?, NOW())
                 """, storedFileId, tenant.value(),
                 "tenants/" + tenant.value() + "/files/" + storedFileId + ".pdf");
+        // Unikalna nazwa per dokument — jest unique index uq_documents_version_filename(version_id, filename).
         jdbc.update("""
                 INSERT INTO documents (id, tenant_id, version_id, stored_file_id, filename, mime_type, size_bytes,
                                        status, uploaded_at, created_at, updated_at)
-                VALUES (?, ?, ?, ?, 'test.pdf', 'application/pdf', 100, 'PENDING', NOW(), NOW(), NOW())
-                """, documentId, tenant.value(), versionId, storedFileId);
+                VALUES (?, ?, ?, ?, ?, 'application/pdf', 100, 'PENDING', NOW(), NOW(), NOW())
+                """, documentId, tenant.value(), versionId, storedFileId, "test-" + documentId + ".pdf");
         return documentId;
     }
 }

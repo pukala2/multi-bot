@@ -1,6 +1,6 @@
 package com.multibot.chat.api;
 
-import com.multibot.integration.IntegrationTestBase;
+import com.multibot.integration.AuthenticatedIntegrationTestBase;
 import io.restassured.RestAssured;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
@@ -12,7 +12,7 @@ import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-class ChatStreamingIT extends IntegrationTestBase {
+class ChatStreamingIT extends AuthenticatedIntegrationTestBase {
 
     @Autowired
     JdbcTemplate jdbc;

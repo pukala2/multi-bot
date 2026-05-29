@@ -2,7 +2,6 @@ package com.multibot.tenant;
 
 import com.multibot.integration.IntegrationTestBase;
 import com.multibot.shared.tenant.TenantId;
-import com.multibot.tenant.domain.model.TenantPlan;
 import com.multibot.tenant.domain.model.TenantSlug;
 import com.multibot.tenant.domain.model.TenantStatus;
 import com.multibot.tenant.domain.port.in.GetTenantUseCase;
@@ -34,7 +33,6 @@ class TenantPersistenceIT extends IntegrationTestBase {
         assertThat(tenant).isPresent();
         assertThat(tenant.get().name()).isEqualTo("Default Tenant");
         assertThat(tenant.get().slug().value()).isEqualTo("default");
-        assertThat(tenant.get().plan()).isEqualTo(TenantPlan.FREE);
         assertThat(tenant.get().status()).isEqualTo(TenantStatus.ACTIVE);
         assertThat(tenant.get().isActive()).isTrue();
     }

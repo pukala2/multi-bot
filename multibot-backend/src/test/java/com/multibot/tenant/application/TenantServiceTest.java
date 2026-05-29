@@ -1,9 +1,9 @@
 package com.multibot.tenant.application;
 
+import com.multibot.shared.organization.OrganizationId;
 import com.multibot.shared.tenant.TenantId;
 import com.multibot.tenant.domain.exception.TenantNotFoundException;
 import com.multibot.tenant.domain.model.Tenant;
-import com.multibot.tenant.domain.model.TenantPlan;
 import com.multibot.tenant.domain.model.TenantSlug;
 import com.multibot.tenant.domain.model.TenantStatus;
 import com.multibot.tenant.domain.port.out.TenantRepository;
@@ -76,10 +76,8 @@ class TenantServiceTest {
                 TenantId.of(UUID.randomUUID()),
                 "Acme Corp",
                 TenantSlug.of("acme-corp"),
-                TenantPlan.FREE,
+                OrganizationId.of(UUID.randomUUID()),
                 TenantStatus.ACTIVE,
-                null,
-                null,
                 now,
                 now);
     }

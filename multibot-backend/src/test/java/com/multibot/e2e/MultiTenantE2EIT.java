@@ -1,6 +1,6 @@
 package com.multibot.e2e;
 
-import com.multibot.integration.IntegrationTestBase;
+import com.multibot.integration.AuthenticatedIntegrationTestBase;
 import io.restassured.RestAssured;
 import org.awaitility.Awaitility;
 import org.junit.jupiter.api.BeforeEach;
@@ -16,7 +16,7 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.equalTo;
 
-class MultiTenantE2EIT extends IntegrationTestBase {
+class MultiTenantE2EIT extends AuthenticatedIntegrationTestBase {
 
     private static final UUID TENANT_A = UUID.fromString("00000000-0000-7000-8000-000000000001");
     private static final UUID TENANT_B = UUID.fromString("00000000-0000-7000-8000-00000000000b");
@@ -32,12 +32,17 @@ class MultiTenantE2EIT extends IntegrationTestBase {
         jdbc.update("DELETE FROM indexing_jobs");
         jdbc.update("DELETE FROM documents");
         jdbc.update("DELETE FROM stored_files");
-        jdbc.update("DELETE FROM tenants WHERE id = ?", TENANT_B);
-        jdbc.update("DELETE FROM tenants WHERE slug = 'tenant-b-e2e'");
+        jdbc.update("DELETE FROM tenants WHERE id = ? OR slug = 'tenant-b-e2e'", TENANT_B);
+        jdbc.update("DELETE FROM organizations WHERE id = ? OR slug = 'org-b-e2e'", TENANT_B);
+        // org B + bot B (organization_id = TENANT_B dla prostoty). Plan/firma są na poziomie org.
         jdbc.update("""
-                INSERT INTO tenants (id, name, slug, plan, status, created_at, updated_at)
-                VALUES (?, 'Tenant B E2E', 'tenant-b-e2e', 'FREE', 'ACTIVE', NOW(), NOW())
+                INSERT INTO organizations (id, name, slug, plan, status, created_at, updated_at)
+                VALUES (?, 'Tenant B E2E', 'org-b-e2e', 'FREE', 'ACTIVE', NOW(), NOW())
                 """, TENANT_B);
+        jdbc.update("""
+                INSERT INTO tenants (id, name, slug, organization_id, status, created_at, updated_at)
+                VALUES (?, 'Tenant B E2E', 'tenant-b-e2e', ?, 'ACTIVE', NOW(), NOW())
+                """, TENANT_B, TENANT_B);
     }
 
     @Test
