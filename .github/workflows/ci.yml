@@ -1,0 +1,60 @@
+name: CI
+
+# Bramka testów: backend (mvn verify na Testcontainers) + frontend (vitest + build typów).
+# Bez sekretów — testy używają mocków LLM/embeddingów i atrap kluczy (application-test.yml).
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend (mvn verify)
+    runs-on: ubuntu-latest
+    env:
+      # Atrapy — nadpisywane przez application-test.yml; chronią przed nieresolved placeholderem.
+      ANTHROPIC_API_KEY: ci-dummy
+      OPENAI_API_KEY: ci-dummy
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+
+      - name: mvn verify (unit + IT na Testcontainers)
+        working-directory: multibot-backend
+        run: ./mvnw -B -ntp verify
+
+  frontend:
+    name: Frontend (test + build)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: multibot-frontend/package-lock.json
+
+      - name: npm ci
+        working-directory: multibot-frontend
+        run: npm ci
+
+      - name: Testy (vitest)
+        working-directory: multibot-frontend
+        run: npm test
+
+      - name: Build (tsc + vite)
+        working-directory: multibot-frontend
+        run: npm run build
