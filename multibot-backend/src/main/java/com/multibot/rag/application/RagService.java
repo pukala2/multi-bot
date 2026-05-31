@@ -1,6 +1,7 @@
 package com.multibot.rag.application;
 
 import com.multibot.indexing.domain.port.out.EmbeddingProvider;
+import com.multibot.rag.domain.model.LlmPrompt;
 import com.multibot.rag.domain.model.RagAnswer;
 import com.multibot.rag.domain.model.RagCitation;
 import com.multibot.rag.domain.model.RagQuery;
@@ -57,7 +58,7 @@ class RagService implements AnswerQuestionUseCase {
 
         logRetrieval(query.question(), topK, minScore, chunks);
 
-        String prompt = promptBuilder.build(chunks, query.history(), query.question(),
+        LlmPrompt prompt = promptBuilder.build(chunks, query.history(), query.question(),
                 settings.systemPrompt());
 
         LlmClient.LlmResponse response = llmClient.complete(prompt, temperature, maxTokens);
@@ -81,7 +82,7 @@ class RagService implements AnswerQuestionUseCase {
 
         logRetrieval(query.question(), topK, minScore, chunks);
 
-        String prompt = promptBuilder.build(chunks, query.history(), query.question(),
+        LlmPrompt prompt = promptBuilder.build(chunks, query.history(), query.question(),
                 settings.systemPrompt());
 
         List<RagCitation> citations = chunks.stream().map(this::toCitation).toList();

@@ -1,5 +1,6 @@
 package com.multibot.rag.infrastructure.springai;
 
+import com.multibot.rag.domain.model.LlmPrompt;
 import com.multibot.rag.domain.port.out.LlmClient;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnMissingBean;
@@ -17,8 +18,12 @@ class SpringAiLlmClientAdapter implements LlmClient {
     }
 
     @Override
-    public LlmResponse complete(String prompt, double temperature, int maxTokens) {
-        String text = chatClient.prompt(prompt).call().content();
+    public LlmResponse complete(LlmPrompt prompt, double temperature, int maxTokens) {
+        // System prompt jako rola systemowa, niezaufane dane jako user — rozdział ról (anti-injection).
+        String text = chatClient.prompt()
+                .system(prompt.system())
+                .user(prompt.user())
+                .call().content();
         if (text == null) {
             text = "";
         }
@@ -27,8 +32,11 @@ class SpringAiLlmClientAdapter implements LlmClient {
     }
 
     @Override
-    public Flux<String> stream(String prompt, double temperature, int maxTokens) {
-        return chatClient.prompt(prompt).stream().content();
+    public Flux<String> stream(LlmPrompt prompt, double temperature, int maxTokens) {
+        return chatClient.prompt()
+                .system(prompt.system())
+                .user(prompt.user())
+                .stream().content();
     }
 
     private static int estimateTokens(String text) {

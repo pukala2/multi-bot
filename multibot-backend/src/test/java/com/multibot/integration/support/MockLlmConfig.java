@@ -1,5 +1,6 @@
 package com.multibot.integration.support;
 
+import com.multibot.rag.domain.model.LlmPrompt;
 import com.multibot.rag.domain.port.out.LlmClient;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
@@ -16,14 +17,14 @@ public class MockLlmConfig {
     public LlmClient mockLlmClient() {
         return new LlmClient() {
             @Override
-            public LlmResponse complete(String prompt, double temperature, int maxTokens) {
-                String answer = "Mock answer based on " + countContextChunks(prompt) + " context chunks.";
+            public LlmResponse complete(LlmPrompt prompt, double temperature, int maxTokens) {
+                String answer = "Mock answer based on " + countContextChunks(prompt.user()) + " context chunks.";
                 return new LlmResponse(answer, answer.length() / 4);
             }
 
             @Override
-            public Flux<String> stream(String prompt, double temperature, int maxTokens) {
-                String answer = "Mock answer based on " + countContextChunks(prompt) + " context chunks.";
+            public Flux<String> stream(LlmPrompt prompt, double temperature, int maxTokens) {
+                String answer = "Mock answer based on " + countContextChunks(prompt.user()) + " context chunks.";
                 String[] words = answer.split(" ");
                 return Flux.fromArray(words)
                         .delayElements(Duration.ofMillis(5))
