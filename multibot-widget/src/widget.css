@@ -23,16 +23,35 @@
 .multibot-bubble {
   width: 56px; height: 56px;
   border-radius: 50%;
-  background: var(--mb-accent);
+  background: var(--mb-icon, var(--mb-accent));
   color: white;
   display: flex; align-items: center; justify-content: center;
   cursor: pointer;
   box-shadow: var(--mb-shadow);
   border: none;
   transition: transform 0.2s, box-shadow 0.2s;
+  overflow: hidden;
+  padding: 0;
 }
 .multibot-bubble:hover { transform: translateY(-2px); box-shadow: 0 16px 48px rgba(0,0,0,0.2); }
 .multibot-bubble svg { width: 26px; height: 26px; }
+/* własny obrazek wypełnia kółko */
+.multibot-bubble.has-img { background: var(--mb-bg); }
+.multibot-icon-img { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+/* avatar bota: nagłówek + przy wiadomościach */
+.multibot-avatar {
+  width: 30px; height: 30px; border-radius: 50%;
+  background: var(--mb-icon, var(--mb-accent));
+  color: white;
+  display: flex; align-items: center; justify-content: center;
+  overflow: hidden; flex-shrink: 0;
+}
+.multibot-avatar svg { width: 16px; height: 16px; }
+.multibot-avatar.has-img { background: var(--mb-bg); }
+.multibot-avatar.sm { width: 24px; height: 24px; }
+.multibot-avatar.sm svg { width: 13px; height: 13px; }
+.multibot-row.bot { display: flex; align-items: flex-end; gap: 7px; max-width: 90%; align-self: flex-start; }
 
 .multibot-window {
   width: 360px;
@@ -49,10 +68,11 @@
 .multibot-header {
   background: var(--mb-accent);
   color: white;
-  padding: 14px 16px;
-  display: flex; align-items: center; justify-content: space-between;
+  padding: 12px 14px;
+  display: flex; align-items: center; gap: 10px;
 }
 .multibot-header-title { font-weight: 600; font-size: 15px; }
+.multibot-header-close { margin-left: auto; }
 .multibot-header-close {
   background: rgba(255,255,255,0.15);
   border: none; color: white;

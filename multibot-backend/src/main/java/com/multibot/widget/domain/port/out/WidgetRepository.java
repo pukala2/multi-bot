@@ -1,7 +1,9 @@
 package com.multibot.widget.domain.port.out;
 
+import com.multibot.widget.domain.model.WidgetIcon;
 import com.multibot.widget.domain.model.WidgetSettings;
 
+import java.time.Instant;
 import java.util.List;
 import java.util.Optional;
 import java.util.UUID;
@@ -30,4 +32,21 @@ public interface WidgetRepository {
 
     /** Ustawia dozwolone origins na aktywnym kluczu danego tenanta (bota). */
     void updateAllowedOriginsByTenant(UUID tenantId, List<String> origins);
+
+    // --- ikonka (obrazek per bot) ---
+
+    /** Zapisuje/zastępuje obrazek ikonki tenanta + ustawia icon_updated_at. */
+    void saveIcon(UUID tenantId, byte[] bytes, String mime, Instant updatedAt);
+
+    /** Usuwa obrazek ikonki tenanta (czyści bytes/mime/updated_at). */
+    void deleteIcon(UUID tenantId);
+
+    /** Epoch millis icon_updated_at tenanta; empty gdy brak ikonki. */
+    Optional<Long> findIconVersionByTenant(UUID tenantId);
+
+    /** Epoch millis icon_updated_at po aktywnym kluczu widgetu; empty gdy brak. */
+    Optional<Long> findIconVersionByKey(String key);
+
+    /** Obrazek ikonki po aktywnym kluczu widgetu; empty gdy brak. */
+    Optional<WidgetIcon> findIconByKey(String key);
 }

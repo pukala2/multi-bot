@@ -519,6 +519,45 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/admin/widget/icon": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Wgraj własną ikonkę bota (PNG/JPG/WebP, max 512 KB)
+         * @description Obrazek pokazywany jako launcher i avatar bota. Walidacja po magic-bytes,
+         *     SVG odrzucone (bezpieczeństwo). Zastępuje poprzednią ikonkę.
+         */
+        post: operations["uploadWidgetIcon"];
+        /** Usuń własną ikonkę (powrót do domyślnej) */
+        delete: operations["deleteWidgetIcon"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/widget/icon/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Publiczny obrazek ikonki bota po kluczu widgetu */
+        get: operations["getWidgetIcon"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/widget/turnstile": {
         parameters: {
             query?: never;
@@ -1051,6 +1090,16 @@ export interface components {
         WidgetSettingsResponse: {
             /** @example #7B5BFF */
             accentColor: string;
+            /**
+             * @description Kolor ikonki/launchera. NULL = użyj accentColor.
+             * @example #16A34A
+             */
+            iconColor?: string | null;
+            /**
+             * @description URL własnej ikonki bota (z cache-bustingiem). NULL = ikona domyślna.
+             * @example /api/widget/icon/pk_widget_live_a1b2?v=1717000000
+             */
+            iconUrl?: string | null;
             /** @enum {string} */
             position: "bottom-right" | "bottom-left";
             /** @example Asystent */
@@ -1061,6 +1110,8 @@ export interface components {
         };
         WidgetSettingsRequest: {
             accentColor: string;
+            /** @description Kolor ikonki/launchera. NULL/puste = użyj accentColor. */
+            iconColor?: string | null;
             /** @enum {string} */
             position: "bottom-right" | "bottom-left";
             title: string;
@@ -2172,6 +2223,82 @@ export interface operations {
                     "application/json": components["schemas"]["WidgetOriginsResponse"];
                 };
             };
+        };
+    };
+    uploadWidgetIcon: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /**
+                     * Format: binary
+                     * @description Obrazek PNG/JPG/WebP, max 512 KB.
+                     */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Ikonka zapisana */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetSettingsResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+        };
+    };
+    deleteWidgetIcon: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Usunięto */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WidgetSettingsResponse"];
+                };
+            };
+        };
+    };
+    getWidgetIcon: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Obrazek */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "image/png": string;
+                    "image/jpeg": string;
+                    "image/webp": string;
+                };
+            };
+            404: components["responses"]["NotFound"];
         };
     };
     getTurnstileConfig: {

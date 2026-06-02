@@ -12,6 +12,18 @@ interface Props {
   config: WidgetConfig;
 }
 
+/** Wizual ikonki: własny obrazek (iconUrl) albo domyślny dymek SVG. */
+function IconVisual({ config }: { config: WidgetConfig }) {
+  if (config.iconUrl) {
+    return <img className="multibot-icon-img" src={config.iconUrl} alt="" />;
+  }
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
+  );
+}
+
 export function ChatWidget({ config }: Props) {
   const [open, setOpen] = useState(false);
   const [sessionId, setSessionId] = useState<string | null>(null);
@@ -87,25 +99,28 @@ export function ChatWidget({ config }: Props) {
     }
   };
 
-  const rootStyle = { '--mb-accent': config.accentColor } as Record<string, string>;
+  const rootStyle = {
+    '--mb-accent': config.accentColor,
+    '--mb-icon': config.iconColor,
+  } as Record<string, string>;
+  const hasImg = !!config.iconUrl;
 
   return (
     <div className={`multibot-widget-root pos-${config.position}`} style={rootStyle}>
       {!open && (
         <button
-          className="multibot-bubble"
+          className={`multibot-bubble${hasImg ? ' has-img' : ''}`}
           onClick={() => setOpen(true)}
           aria-label="Otwórz czat"
         >
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
-          </svg>
+          <IconVisual config={config} />
         </button>
       )}
 
       {open && (
         <div className="multibot-window">
           <div className="multibot-header">
+            <span className={`multibot-avatar${hasImg ? ' has-img' : ''}`}><IconVisual config={config} /></span>
             <div className="multibot-header-title">{config.title}</div>
             <button
               className="multibot-header-close"
@@ -120,18 +135,28 @@ export function ChatWidget({ config }: Props) {
           </div>
 
           <div className="multibot-messages" ref={messagesRef}>
-            {turns.map((turn, i) => (
-              <div key={i} className={`multibot-msg ${turn.role}`}>{turn.content}</div>
-            ))}
+            {turns.map((turn, i) =>
+              turn.role === 'bot' ? (
+                <div key={i} className="multibot-row bot">
+                  <span className={`multibot-avatar sm${hasImg ? ' has-img' : ''}`}><IconVisual config={config} /></span>
+                  <div className="multibot-msg bot">{turn.content}</div>
+                </div>
+              ) : (
+                <div key={i} className="multibot-msg user">{turn.content}</div>
+              )
+            )}
             {isStreaming && (
-              <div className="multibot-msg bot">
-                {streamingText || (
-                  <div className="multibot-typing">
-                    <span className="multibot-typing-dot" />
-                    <span className="multibot-typing-dot" />
-                    <span className="multibot-typing-dot" />
-                  </div>
-                )}
+              <div className="multibot-row bot">
+                <span className={`multibot-avatar sm${hasImg ? ' has-img' : ''}`}><IconVisual config={config} /></span>
+                <div className="multibot-msg bot">
+                  {streamingText || (
+                    <div className="multibot-typing">
+                      <span className="multibot-typing-dot" />
+                      <span className="multibot-typing-dot" />
+                      <span className="multibot-typing-dot" />
+                    </div>
+                  )}
+                </div>
               </div>
             )}
           </div>

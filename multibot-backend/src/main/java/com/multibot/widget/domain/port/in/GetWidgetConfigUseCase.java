@@ -2,7 +2,7 @@ package com.multibot.widget.domain.port.in;
 
 import com.multibot.shared.tenant.TenantId;
 import com.multibot.widget.domain.model.WidgetConfig;
-import com.multibot.widget.domain.model.WidgetSettings;
+import com.multibot.widget.domain.model.WidgetIcon;
 
 import java.util.List;
 import java.util.Optional;
@@ -11,7 +11,11 @@ public interface GetWidgetConfigUseCase {
 
     WidgetConfig getForCurrentTenant();
 
-    Optional<WidgetSettings> getByPublicKey(String key);
+    /** Publiczna konfiguracja po kluczu widgetu (key + settings + iconVersion). */
+    Optional<WidgetConfig> getByPublicKey(String key);
+
+    /** Obrazek ikonki po kluczu widgetu — do publicznego serwowania. */
+    Optional<WidgetIcon> getIconByKey(String key);
 
     /**
      * Sprawdza czy dany Origin moze uzywac danego klucza.

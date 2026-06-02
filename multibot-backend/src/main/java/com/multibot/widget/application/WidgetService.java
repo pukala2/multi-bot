@@ -4,6 +4,7 @@ import com.multibot.shared.exception.ValidationException;
 import com.multibot.shared.tenant.TenantId;
 import com.multibot.tenancy.TenantContext;
 import com.multibot.widget.domain.model.WidgetConfig;
+import com.multibot.widget.domain.model.WidgetIcon;
 import com.multibot.widget.domain.model.WidgetSettings;
 import com.multibot.widget.domain.port.in.GetWidgetConfigUseCase;
 import com.multibot.widget.domain.port.in.UpdateWidgetSettingsUseCase;
@@ -13,6 +14,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.net.URI;
 import java.security.SecureRandom;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashSet;
@@ -26,6 +28,7 @@ class WidgetService implements GetWidgetConfigUseCase, UpdateWidgetSettingsUseCa
 
     private static final Set<String> ALLOWED_POSITIONS = Set.of("bottom-right", "bottom-left");
     private static final SecureRandom RND = new SecureRandom();
+    private static final int MAX_ICON_BYTES = 512 * 1024;
 
     private final WidgetRepository repository;
 
@@ -39,17 +42,26 @@ class WidgetService implements GetWidgetConfigUseCase, UpdateWidgetSettingsUseCa
         UUID tenantId = TenantContext.get().value();
         WidgetSettings settings = findOrCreateSettings(tenantId);
         String key = findOrCreateKey(tenantId);
-        return new WidgetConfig(key, settings);
+        Long iconVersion = repository.findIconVersionByTenant(tenantId).orElse(null);
+        return new WidgetConfig(key, settings, iconVersion);
     }
 
     @Override
     @Transactional
-    public Optional<WidgetSettings> getByPublicKey(String key) {
+    public Optional<WidgetConfig> getByPublicKey(String key) {
         return repository.findTenantIdByActiveKey(key)
                 .map(tenantId -> {
                     repository.touchKey(key);
-                    return repository.findSettings(tenantId).orElseGet(WidgetSettings::defaults);
+                    WidgetSettings settings = repository.findSettings(tenantId).orElseGet(WidgetSettings::defaults);
+                    Long iconVersion = repository.findIconVersionByKey(key).orElse(null);
+                    return new WidgetConfig(key, settings, iconVersion);
                 });
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Optional<WidgetIcon> getIconByKey(String key) {
+        return repository.findIconByKey(key);
     }
 
     @Override
@@ -85,6 +97,50 @@ class WidgetService implements GetWidgetConfigUseCase, UpdateWidgetSettingsUseCa
         findOrCreateSettings(tenantId);
         repository.updateSettings(tenantId, settings);
         return repository.findSettings(tenantId).orElse(settings);
+    }
+
+    @Override
+    @Transactional
+    public WidgetConfig uploadIconForCurrentTenant(byte[] bytes, String contentType) {
+        if (bytes == null || bytes.length == 0) {
+            throw new ValidationException("Plik jest pusty");
+        }
+        if (bytes.length > MAX_ICON_BYTES) {
+            throw new ValidationException("Obrazek przekracza limit 512 KB");
+        }
+        String mime = detectImageMime(bytes);   // po MAGIC BYTES, nie po contentType z uploadu
+        if (mime == null) {
+            throw new ValidationException("Niedozwolony format. Dozwolone: PNG, JPG, WebP (SVG zabronione).");
+        }
+        UUID tenantId = TenantContext.get().value();
+        findOrCreateSettings(tenantId);
+        findOrCreateKey(tenantId);
+        repository.saveIcon(tenantId, bytes, mime, Instant.now());
+        return getForCurrentTenant();
+    }
+
+    @Override
+    @Transactional
+    public WidgetConfig deleteIconForCurrentTenant() {
+        UUID tenantId = TenantContext.get().value();
+        repository.deleteIcon(tenantId);
+        return getForCurrentTenant();
+    }
+
+    /** Rozpoznaje format po sygnaturze bajtów. Zwraca MIME albo null gdy nieobsługiwany. */
+    private static String detectImageMime(byte[] b) {
+        if (b.length >= 8 && (b[0] & 0xFF) == 0x89 && b[1] == 0x50 && b[2] == 0x4E && b[3] == 0x47
+                && b[4] == 0x0D && b[5] == 0x0A && b[6] == 0x1A && b[7] == 0x0A) {
+            return "image/png";
+        }
+        if (b.length >= 3 && (b[0] & 0xFF) == 0xFF && (b[1] & 0xFF) == 0xD8 && (b[2] & 0xFF) == 0xFF) {
+            return "image/jpeg";
+        }
+        if (b.length >= 12 && b[0] == 'R' && b[1] == 'I' && b[2] == 'F' && b[3] == 'F'
+                && b[8] == 'W' && b[9] == 'E' && b[10] == 'B' && b[11] == 'P') {
+            return "image/webp";
+        }
+        return null;
     }
 
     @Override
@@ -144,6 +200,9 @@ class WidgetService implements GetWidgetConfigUseCase, UpdateWidgetSettingsUseCa
     private void validate(WidgetSettings s) {
         if (s.accentColor() == null || !s.accentColor().matches("^#[0-9A-Fa-f]{6}$")) {
             throw new ValidationException("accentColor must be a hex color like #RRGGBB");
+        }
+        if (s.iconColor() != null && !s.iconColor().matches("^#[0-9A-Fa-f]{6}$")) {
+            throw new ValidationException("iconColor must be a hex color like #RRGGBB or null");
         }
         if (!ALLOWED_POSITIONS.contains(s.position())) {
             throw new ValidationException("position must be one of: bottom-right, bottom-left");

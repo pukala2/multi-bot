@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Copy, Check, Save, Plus, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { Copy, Check, Save, Plus, X, ImagePlus, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Topbar } from '@/components/layout/Topbar';
 import { Button } from '@/components/ui/button';
@@ -8,8 +8,13 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useWidgetAdmin, useUpdateWidgetSettings } from '@/hooks/useWidgetAdmin';
 import { useWidgetOrigins, useUpdateWidgetOrigins } from '@/hooks/useWidgetOrigins';
+import { useUploadWidgetIcon, useDeleteWidgetIcon } from '@/hooks/useWidgetIcon';
 import { showApiError } from '@/api/errors';
+import { cn } from '@/lib/cn';
 import type { components } from '@/api/schema';
+
+const ICON_MAX_BYTES = 512 * 1024;
+const ICON_TYPES = ['image/png', 'image/jpeg', 'image/webp'];
 
 type Position = 'bottom-right' | 'bottom-left';
 type Settings = components['schemas']['WidgetSettingsRequest'];
@@ -34,10 +39,29 @@ export function WidgetPage() {
   const updateMutation = useUpdateWidgetSettings();
   const origins = useWidgetOrigins();
   const updateOrigins = useUpdateWidgetOrigins();
+  const uploadIcon = useUploadWidgetIcon();
+  const deleteIcon = useDeleteWidgetIcon();
+  const iconInputRef = useRef<HTMLInputElement>(null);
   const [draft, setDraft] = useState<Settings | null>(null);
   const [originsList, setOriginsList] = useState<string[] | null>(null);
   const [newOrigin, setNewOrigin] = useState('');
   const [copied, setCopied] = useState(false);
+
+  const pickIcon = (file: File | undefined) => {
+    if (!file) return;
+    if (!ICON_TYPES.includes(file.type)) {
+      toast.error('Niedozwolony format', { description: 'Dozwolone: PNG, JPG, WebP.' });
+      return;
+    }
+    if (file.size > ICON_MAX_BYTES) {
+      toast.error('Obrazek za duży', { description: 'Maks. 512 KB.' });
+      return;
+    }
+    uploadIcon.mutate(file, {
+      onSuccess: () => toast.success('Ikonka zapisana'),
+      onError: (err) => showApiError(err, 'Nie udało się wgrać ikonki'),
+    });
+  };
 
   useEffect(() => {
     if (origins.data && originsList === null) {
@@ -76,6 +100,7 @@ export function WidgetPage() {
       const s = widget.data.settings;
       setDraft({
         accentColor: s.accentColor,
+        iconColor: s.iconColor ?? null,
         position: s.position,
         title: s.title,
         greeting: s.greeting,
@@ -117,6 +142,8 @@ export function WidgetPage() {
   if (!widget.data || !draft) return null;
 
   const snippet = buildSnippet(widget.data.publicKey);
+  const iconColorVal = draft.iconColor ?? draft.accentColor;
+  const iconUrl = widget.data.settings.iconUrl;
 
   return (
     <>
@@ -202,6 +229,57 @@ export function WidgetPage() {
           <Card>
             <CardHeader>
               <div>
+                <CardTitle>Ikonka bota</CardTitle>
+                <CardSubtitle>Twój obrazek zamiast domyślnej ikony — w dymku i przy wiadomościach.</CardSubtitle>
+              </div>
+            </CardHeader>
+            <CardBody>
+              <input
+                ref={iconInputRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={(e) => { pickIcon(e.target.files?.[0]); e.target.value = ''; }}
+              />
+              <div className="flex items-center gap-4">
+                <div
+                  className="size-16 rounded-2xl border border-border-strong flex items-center justify-center overflow-hidden shrink-0"
+                  style={{ background: widget.data.settings.iconUrl ? '#fff' : (draft.iconColor ?? draft.accentColor) }}
+                >
+                  {widget.data.settings.iconUrl
+                    ? <img src={widget.data.settings.iconUrl} alt="" className="size-full object-cover" />
+                    : <ImagePlus className="size-6 text-white/90" />}
+                </div>
+                <div className="flex-1">
+                  <div className="flex gap-2">
+                    <Button variant="secondary" onClick={() => iconInputRef.current?.click()} disabled={uploadIcon.isPending}>
+                      <ImagePlus className="size-3.5" /> {uploadIcon.isPending ? 'Wgrywam…' : (widget.data.settings.iconUrl ? 'Zmień ikonkę' : 'Wgraj ikonkę')}
+                    </Button>
+                    {widget.data.settings.iconUrl && (
+                      <Button
+                        variant="secondary"
+                        onClick={() => deleteIcon.mutate(undefined, {
+                          onSuccess: () => toast.success('Usunięto ikonkę'),
+                          onError: (err) => showApiError(err, 'Nie udało się usunąć'),
+                        })}
+                        disabled={deleteIcon.isPending}
+                        className="text-error hover:text-error"
+                      >
+                        <Trash2 className="size-3.5" /> Usuń
+                      </Button>
+                    )}
+                  </div>
+                  <p className="text-[11.5px] text-text-dim mt-2 leading-relaxed">
+                    PNG, JPG lub WebP · maks. 512 KB · zalecane kwadratowe. SVG niedozwolone.
+                  </p>
+                </div>
+              </div>
+            </CardBody>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <div>
                 <CardTitle>Wygląd i zachowanie</CardTitle>
                 <CardSubtitle>Zmiany odświeżają się na żywo u klientów po zapisaniu</CardSubtitle>
               </div>
@@ -223,6 +301,41 @@ export function WidgetPage() {
                       className="flex-1 mono"
                     />
                   </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1.5">
+                    <label className="text-[12.5px] text-text-muted">Kolor ikonki / dymka</label>
+                    {!iconUrl && draft.iconColor != null && (
+                      <button
+                        onClick={() => updateField('iconColor', null)}
+                        className="text-[11px] text-text-dim hover:text-text"
+                        title="Użyj koloru akcentu"
+                      >
+                        = akcent
+                      </button>
+                    )}
+                  </div>
+                  <div className={cn('flex gap-2 items-center', iconUrl && 'opacity-50 pointer-events-none')}>
+                    <input
+                      type="color"
+                      value={draft.iconColor ?? draft.accentColor}
+                      onChange={(e) => updateField('iconColor', e.target.value)}
+                      disabled={!!iconUrl}
+                      className="size-9 rounded-md border border-border bg-bg-panel cursor-pointer"
+                    />
+                    <Input
+                      value={draft.iconColor ?? draft.accentColor}
+                      onChange={(e) => updateField('iconColor', (e.target as HTMLInputElement).value)}
+                      disabled={!!iconUrl}
+                      className="flex-1 mono"
+                    />
+                  </div>
+                  {iconUrl && (
+                    <p className="text-[11px] text-text-dim mt-1.5">
+                      Nieaktywne — własna ikonka zastępuje kolor. Usuń ikonkę, by użyć koloru.
+                    </p>
+                  )}
                 </div>
 
                 <div>
@@ -281,15 +394,33 @@ export function WidgetPage() {
               style={{ background: '#ffffff' }}
             >
               <div
-                className="px-4 py-3 flex items-center justify-between text-white text-[13px] font-semibold"
+                className="px-4 py-3 flex items-center gap-2.5 text-white text-[13px] font-semibold"
                 style={{ background: draft.accentColor }}
               >
+                <span
+                  className="size-7 rounded-full flex items-center justify-center overflow-hidden shrink-0"
+                  style={{ background: iconUrl ? '#fff' : iconColorVal }}
+                >
+                  {iconUrl
+                    ? <img src={iconUrl} alt="" className="size-full object-cover" />
+                    : <span className="size-3 rounded-sm bg-white/90" />}
+                </span>
                 {draft.title}
-                <span>×</span>
+                <span className="ml-auto">×</span>
               </div>
               <div className="bg-[#f6f6f8] p-3 space-y-2 min-h-[180px]">
-                <div className="bg-white border border-[#e5e5ea] rounded-2xl rounded-bl-md px-3 py-2 text-[13px] text-[#1a1a1f] max-w-[85%]">
-                  {draft.greeting}
+                <div className="flex items-end gap-1.5 max-w-[90%]">
+                  <span
+                    className="size-6 rounded-full flex items-center justify-center overflow-hidden shrink-0"
+                    style={{ background: iconUrl ? '#fff' : iconColorVal }}
+                  >
+                    {iconUrl
+                      ? <img src={iconUrl} alt="" className="size-full object-cover" />
+                      : <span className="size-2.5 rounded-sm bg-white/90" />}
+                  </span>
+                  <div className="bg-white border border-[#e5e5ea] rounded-2xl rounded-bl-md px-3 py-2 text-[13px] text-[#1a1a1f]">
+                    {draft.greeting}
+                  </div>
                 </div>
                 <div
                   className="rounded-2xl rounded-br-md px-3 py-2 text-[13px] text-white max-w-[85%] ml-auto"
@@ -310,7 +441,22 @@ export function WidgetPage() {
                 </div>
               </div>
             </div>
-            <div className="text-[11px] text-text-dim mt-3 text-center">
+            <div className="flex items-center justify-center gap-2 mt-4 text-[11px] text-text-dim">
+              <span>launcher:</span>
+              <span
+                className="size-11 rounded-full flex items-center justify-center overflow-hidden shadow-lg"
+                style={{ background: iconUrl ? '#fff' : iconColorVal }}
+              >
+                {iconUrl
+                  ? <img src={iconUrl} alt="" className="size-full object-cover" />
+                  : (
+                    <svg viewBox="0 0 24 24" className="size-5 text-white" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+                    </svg>
+                  )}
+              </span>
+            </div>
+            <div className="text-[11px] text-text-dim mt-2 text-center">
               pozycja: {draft.position === 'bottom-right' ? 'prawy dół' : 'lewy dół'}
             </div>
           </CardBody>

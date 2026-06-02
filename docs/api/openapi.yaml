@@ -31,6 +31,8 @@ tags:
     description: Plan i zużycie wiadomości aktualnego bota (liczby user-friendly, bez tokenów/kosztów).
   - name: WidgetOrigins
     description: Dozwolone domeny widgetu aktywnego bota (allowed_origins).
+  - name: WidgetIcon
+    description: Własna ikonka bota (upload/usuń w panelu, publiczne serwowanie po kluczu).
   - name: Turnstile
     description: Publiczna konfiguracja anty-bota (Cloudflare Turnstile) dla widgetu.
 
@@ -864,6 +866,82 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WidgetOriginsResponse'
+
+  # ----- Ikonka widgetu (własny obrazek bota) -----
+
+  /api/admin/widget/icon:
+    post:
+      tags:
+        - WidgetIcon
+      summary: Wgraj własną ikonkę bota (PNG/JPG/WebP, max 512 KB)
+      description: |
+        Obrazek pokazywany jako launcher i avatar bota. Walidacja po magic-bytes,
+        SVG odrzucone (bezpieczeństwo). Zastępuje poprzednią ikonkę.
+      operationId: uploadWidgetIcon
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: Obrazek PNG/JPG/WebP, max 512 KB.
+              required: [file]
+      responses:
+        '200':
+          description: Ikonka zapisana
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WidgetSettingsResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+    delete:
+      tags:
+        - WidgetIcon
+      summary: Usuń własną ikonkę (powrót do domyślnej)
+      operationId: deleteWidgetIcon
+      responses:
+        '200':
+          description: Usunięto
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WidgetSettingsResponse'
+
+  /api/widget/icon/{key}:
+    get:
+      tags:
+        - WidgetIcon
+      summary: Publiczny obrazek ikonki bota po kluczu widgetu
+      operationId: getWidgetIcon
+      parameters:
+        - name: key
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Obrazek
+          content:
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        '404':
+          $ref: '#/components/responses/NotFound'
 
   # ----- Turnstile (publiczna konfiguracja anty-bota) -----
 
@@ -1828,6 +1906,16 @@ components:
         accentColor:
           type: string
           example: "#7B5BFF"
+        iconColor:
+          type: string
+          nullable: true
+          description: Kolor ikonki/launchera. NULL = użyj accentColor.
+          example: "#16A34A"
+        iconUrl:
+          type: string
+          nullable: true
+          description: URL własnej ikonki bota (z cache-bustingiem). NULL = ikona domyślna.
+          example: "/api/widget/icon/pk_widget_live_a1b2?v=1717000000"
         position:
           type: string
           enum: [bottom-right, bottom-left]
@@ -1848,6 +1936,11 @@ components:
         accentColor:
           type: string
           pattern: '^#[0-9A-Fa-f]{6}$'
+        iconColor:
+          type: string
+          nullable: true
+          pattern: '^#[0-9A-Fa-f]{6}$'
+          description: Kolor ikonki/launchera. NULL/puste = użyj accentColor.
         position:
           type: string
           enum: [bottom-right, bottom-left]

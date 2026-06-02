@@ -2,6 +2,8 @@ export interface WidgetConfig {
   apiUrl: string;
   publicKey: string | null;
   accentColor: string;
+  iconColor: string;           // kolor launchera/avatara (z serwera iconColor ?? accentColor)
+  iconUrl: string | null;      // absolutny URL własnej ikonki bota (null = ikona domyślna)
   position: 'bottom-right' | 'bottom-left';
   greeting: string;
   title: string;
@@ -18,6 +20,8 @@ const DEFAULTS: WidgetConfig = {
   apiUrl: 'http://localhost:8080',
   publicKey: null,
   accentColor: '#7B5BFF',
+  iconColor: '#7B5BFF',
+  iconUrl: null,
   position: 'bottom-right',
   greeting: 'Cześć! Jak mogę pomóc?',
   title: 'Asystent',
@@ -52,6 +56,8 @@ export async function resolveConfig(boot: BootConfig): Promise<WidgetConfig> {
       if (response.ok) {
         const data = await response.json() as {
           accentColor?: string;
+          iconColor?: string | null;
+          iconUrl?: string | null;
           position?: WidgetConfig['position'];
           title?: string;
           greeting?: string;
@@ -59,6 +65,9 @@ export async function resolveConfig(boot: BootConfig): Promise<WidgetConfig> {
         };
         serverConfig = {
           accentColor: data.accentColor,
+          iconColor: data.iconColor ?? undefined,
+          // iconUrl z serwera jest względny (/api/widget/icon/...) — robimy absolutny do apiUrl
+          iconUrl: data.iconUrl ? `${boot.apiUrl}${data.iconUrl}` : null,
           position: data.position,
           title: data.title,
           greeting: data.greeting,
@@ -70,10 +79,13 @@ export async function resolveConfig(boot: BootConfig): Promise<WidgetConfig> {
     }
   }
 
+  const accentColor = boot.overrides.accentColor ?? serverConfig.accentColor ?? DEFAULTS.accentColor;
   return {
     apiUrl: boot.apiUrl,
     publicKey: boot.publicKey,
-    accentColor: boot.overrides.accentColor ?? serverConfig.accentColor ?? DEFAULTS.accentColor,
+    accentColor,
+    iconColor: serverConfig.iconColor ?? accentColor,   // brak iconColor => kolor akcentu
+    iconUrl: serverConfig.iconUrl ?? null,
     position: boot.overrides.position ?? serverConfig.position ?? DEFAULTS.position,
     greeting: boot.overrides.greeting ?? serverConfig.greeting ?? DEFAULTS.greeting,
     title: boot.overrides.title ?? serverConfig.title ?? DEFAULTS.title,

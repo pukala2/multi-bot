@@ -1,5 +1,6 @@
 package com.multibot.widget.infrastructure.persistence;
 
+import com.multibot.widget.domain.model.WidgetIcon;
 import com.multibot.widget.domain.model.WidgetSettings;
 import com.multibot.widget.domain.port.out.WidgetRepository;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -9,6 +10,8 @@ import org.springframework.stereotype.Repository;
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Optional;
@@ -28,7 +31,7 @@ class WidgetJdbcRepository implements WidgetRepository {
         try {
             WidgetSettings settings = jdbc.queryForObject(
                     """
-                    SELECT accent_color, position, title, greeting, placeholder, is_active
+                    SELECT accent_color, icon_color, position, title, greeting, placeholder, is_active
                     FROM widget_settings
                     WHERE tenant_id = ?
                     """,
@@ -42,10 +45,10 @@ class WidgetJdbcRepository implements WidgetRepository {
     @Override
     public void insertSettings(UUID tenantId, WidgetSettings settings) {
         jdbc.update("""
-                INSERT INTO widget_settings (tenant_id, accent_color, position, title, greeting, placeholder, is_active)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                INSERT INTO widget_settings (tenant_id, accent_color, icon_color, position, title, greeting, placeholder, is_active)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                tenantId, settings.accentColor(), settings.position(), settings.title(),
+                tenantId, settings.accentColor(), settings.iconColor(), settings.position(), settings.title(),
                 settings.greeting(), settings.placeholder(), settings.isActive());
     }
 
@@ -53,10 +56,10 @@ class WidgetJdbcRepository implements WidgetRepository {
     public void updateSettings(UUID tenantId, WidgetSettings settings) {
         jdbc.update("""
                 UPDATE widget_settings
-                SET accent_color = ?, position = ?, title = ?, greeting = ?, placeholder = ?, is_active = ?, updated_at = NOW()
+                SET accent_color = ?, icon_color = ?, position = ?, title = ?, greeting = ?, placeholder = ?, is_active = ?, updated_at = NOW()
                 WHERE tenant_id = ?
                 """,
-                settings.accentColor(), settings.position(), settings.title(),
+                settings.accentColor(), settings.iconColor(), settings.position(), settings.title(),
                 settings.greeting(), settings.placeholder(), settings.isActive(),
                 tenantId);
     }
@@ -138,9 +141,69 @@ class WidgetJdbcRepository implements WidgetRepository {
         });
     }
 
+    @Override
+    public void saveIcon(UUID tenantId, byte[] bytes, String mime, Instant updatedAt) {
+        jdbc.update("""
+                UPDATE widget_settings
+                SET icon_bytes = ?, icon_mime = ?, icon_updated_at = ?, updated_at = NOW()
+                WHERE tenant_id = ?
+                """,
+                bytes, mime, Timestamp.from(updatedAt), tenantId);
+    }
+
+    @Override
+    public void deleteIcon(UUID tenantId) {
+        jdbc.update("""
+                UPDATE widget_settings
+                SET icon_bytes = NULL, icon_mime = NULL, icon_updated_at = NULL, updated_at = NOW()
+                WHERE tenant_id = ?
+                """, tenantId);
+    }
+
+    @Override
+    public Optional<Long> findIconVersionByTenant(UUID tenantId) {
+        return iconVersion("WHERE tenant_id = ?", tenantId);
+    }
+
+    @Override
+    public Optional<Long> findIconVersionByKey(String key) {
+        return iconVersion(
+                "WHERE tenant_id = (SELECT tenant_id FROM widget_keys WHERE key = ? AND is_active = true)", key);
+    }
+
+    private Optional<Long> iconVersion(String whereClause, Object param) {
+        try {
+            Timestamp ts = jdbc.queryForObject(
+                    "SELECT icon_updated_at FROM widget_settings " + whereClause, Timestamp.class, param);
+            return ts == null ? Optional.empty() : Optional.of(ts.getTime());
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
+    }
+
+    @Override
+    public Optional<WidgetIcon> findIconByKey(String key) {
+        try {
+            WidgetIcon icon = jdbc.queryForObject("""
+                    SELECT icon_bytes, icon_mime FROM widget_settings
+                    WHERE tenant_id = (SELECT tenant_id FROM widget_keys WHERE key = ? AND is_active = true)
+                    """,
+                    (rs, rowNum) -> {
+                        byte[] bytes = rs.getBytes("icon_bytes");
+                        String mime = rs.getString("icon_mime");
+                        return (bytes == null || mime == null) ? null : new WidgetIcon(bytes, mime);
+                    },
+                    key);
+            return Optional.ofNullable(icon);
+        } catch (EmptyResultDataAccessException e) {
+            return Optional.empty();
+        }
+    }
+
     private WidgetSettings mapSettings(ResultSet rs, int rowNum) throws SQLException {
         return new WidgetSettings(
                 rs.getString("accent_color"),
+                rs.getString("icon_color"),
                 rs.getString("position"),
                 rs.getString("title"),
                 rs.getString("greeting"),

@@ -33,13 +33,14 @@ class WidgetController implements WidgetApi, WidgetAdminApi {
     @Override
     public ResponseEntity<WidgetAdminConfigResponse> getWidgetAdminConfig() {
         WidgetConfig config = getConfig.getForCurrentTenant();
-        return ResponseEntity.ok(new WidgetAdminConfigResponse(config.key(), toResponse(config.settings())));
+        return ResponseEntity.ok(new WidgetAdminConfigResponse(config.key(), toResponse(config)));
     }
 
     @Override
     public ResponseEntity<WidgetSettingsResponse> updateWidgetSettings(WidgetSettingsRequest request) {
-        WidgetSettings updated = updateSettings.update(toDomain(request));
-        return ResponseEntity.ok(toResponse(updated));
+        updateSettings.update(toDomain(request));
+        // Pełny config (z key + iconVersion) żeby zwrócić aktualny iconUrl.
+        return ResponseEntity.ok(toResponse(getConfig.getForCurrentTenant()));
     }
 
     @Override
@@ -49,24 +50,33 @@ class WidgetController implements WidgetApi, WidgetAdminApi {
         if (!getConfig.isOriginAllowed(key, origin)) {
             throw new ForbiddenException("Origin '" + origin + "' is not allowed for this widget key");
         }
-        WidgetSettings settings = getConfig.getByPublicKey(key)
+        WidgetConfig config = getConfig.getByPublicKey(key)
                 .orElseThrow(() -> new NotFoundException("Widget key not found: " + key));
-        return ResponseEntity.ok(toResponse(settings));
+        return ResponseEntity.ok(toResponse(config));
     }
 
-    private static WidgetSettingsResponse toResponse(WidgetSettings s) {
-        return new WidgetSettingsResponse(
+    /** Mapowanie domeny -> response. iconUrl budowany z klucza + wersji (cache-busting), null gdy brak ikonki. */
+    static WidgetSettingsResponse toResponse(WidgetConfig config) {
+        WidgetSettings s = config.settings();
+        WidgetSettingsResponse resp = new WidgetSettingsResponse(
                 s.accentColor(),
                 WidgetSettingsResponse.PositionEnum.fromValue(s.position()),
                 s.title(),
                 s.greeting(),
                 s.placeholder(),
                 s.isActive());
+        resp.setIconColor(s.iconColor());
+        resp.setIconUrl(config.iconVersion() == null
+                ? null
+                : "/api/widget/icon/" + config.key() + "?v=" + config.iconVersion());
+        return resp;
     }
 
     private static WidgetSettings toDomain(WidgetSettingsRequest r) {
+        String iconColor = (r.getIconColor() == null || r.getIconColor().isBlank()) ? null : r.getIconColor();
         return new WidgetSettings(
                 r.getAccentColor(),
+                iconColor,
                 r.getPosition().getValue(),
                 r.getTitle(),
                 r.getGreeting(),
