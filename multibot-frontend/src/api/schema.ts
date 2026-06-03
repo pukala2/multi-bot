@@ -467,6 +467,40 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/super-admin/ai-credit": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Stan portfela AI (doładowano / wydane / pozostało + wpisy) */
+        get: operations["getAiCredit"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/super-admin/ai-credit/topups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** Dodaj wpis doładowania (kwota ujemna = korekta) */
+        post: operations["addAiCreditTopup"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/admin/billing/usage": {
         parameters: {
             query?: never;
@@ -728,9 +762,38 @@ export interface components {
              * @description -1 = bez limitu.
              */
             effectiveLimit: number;
+            /**
+             * Format: int64
+             * @description Suma tokenów organizacji w bieżącym miesiącu (diagnostyka super admina).
+             */
+            tokensUsed?: number;
+            /** @description Szacowany koszt AI organizacji w bieżącym miesiącu ($). */
+            costUsd?: number;
             bots: components["schemas"]["OrganizationBotRow"][];
             /** @description ISO 8601 (instant). */
             createdAt: string;
+        };
+        AiCreditTopupRow: {
+            /** Format: uuid */
+            id: string;
+            amountUsd: number;
+            note?: string | null;
+            /** @description ISO 8601 (instant). */
+            createdAt: string;
+        };
+        AiCreditSummaryResponse: {
+            /** @description Suma doładowań ($, all-time). */
+            toppedUp: number;
+            /** @description Szacowany koszt AI ($, all-time, wszystkie organizacje). */
+            spent: number;
+            /** @description toppedUp − spent. */
+            remaining: number;
+            topups: components["schemas"]["AiCreditTopupRow"][];
+        };
+        AddTopupRequest: {
+            /** @description Kwota doładowania w $ (ujemna = korekta). */
+            amount: number;
+            note?: string | null;
         };
         CreateOrganizationRequest: {
             name: string;
@@ -2139,6 +2202,51 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+        };
+    };
+    getAiCredit: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description OK */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCreditSummaryResponse"];
+                };
+            };
+        };
+    };
+    addAiCreditTopup: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AddTopupRequest"];
+            };
+        };
+        responses: {
+            /** @description Zaktualizowany stan portfela */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AiCreditSummaryResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
         };
     };
     getBillingUsage: {

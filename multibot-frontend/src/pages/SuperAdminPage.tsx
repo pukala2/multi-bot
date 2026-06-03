@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from 'react';
-import { Plus, Copy, Check, Building2, Bot } from 'lucide-react';
+import { Plus, Copy, Check, Building2, Bot, Wallet } from 'lucide-react';
 import { toast } from 'sonner';
 import { Topbar } from '@/components/layout/Topbar';
 import { Card, CardBody } from '@/components/ui/card';
@@ -15,8 +15,11 @@ import {
   type ProvisionResult,
   type AddBotResult,
 } from '@/hooks/useSuperAdmin';
+import { useAiCredit, useAddTopup } from '@/hooks/useAiCredit';
 import { cn } from '@/lib/cn';
 import { botColor, botColorTint } from '@/lib/botColor';
+
+const usd = (n: number) => `$${n.toFixed(2)}`;
 
 const PLANS = ['FREE', 'BASIC', 'PRO', 'ENTERPRISE'];
 
@@ -94,6 +97,8 @@ export function SuperAdminPage() {
           </Button>
         }
       />
+
+      <AiCreditPanel />
 
       {orgs.isPending ? (
         <Card><CardBody><div className="h-40 bg-bg-elevated/40 rounded animate-pulse" /></CardBody></Card>
@@ -241,6 +246,111 @@ export function SuperAdminPage() {
   );
 }
 
+function AiCreditPanel() {
+  const credit = useAiCredit();
+  const addTopup = useAddTopup();
+  const [open, setOpen] = useState(false);
+  const [amount, setAmount] = useState('');
+  const [note, setNote] = useState('');
+  const [error, setError] = useState<string | null>(null);
+
+  const d = credit.data;
+  const pct = d && d.toppedUp > 0 ? Math.min(100, Math.round((d.spent / d.toppedUp) * 100)) : 0;
+
+  async function submit(e: FormEvent) {
+    e.preventDefault();
+    setError(null);
+    const val = parseFloat(amount.replace(',', '.'));
+    if (Number.isNaN(val) || val === 0) { setError('Podaj kwotę (np. 5 albo -2 dla korekty)'); return; }
+    try {
+      await addTopup.mutateAsync({ amount: val, note: note || undefined });
+      setOpen(false); setAmount(''); setNote('');
+      toast.success('Doładowanie zapisane');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Nie udało się zapisać');
+    }
+  }
+
+  return (
+    <Card className="mb-4">
+      <CardBody>
+        <div className="flex items-start justify-between gap-3">
+          <div className="flex items-center gap-2.5">
+            <div className="size-9 rounded-lg bg-bg-elevated flex items-center justify-center text-accent shrink-0">
+              <Wallet className="size-4" />
+            </div>
+            <div>
+              <div className="text-[14px] font-semibold">Portfel AI (tokeny)</div>
+              <div className="text-[11px] text-text-dim">Wewnętrzne, tylko dla Ciebie. Koszt to szacunek, nie faktura.</div>
+            </div>
+          </div>
+          <Button variant="secondary" size="sm" onClick={() => { setAmount(''); setNote(''); setError(null); setOpen(true); }}>
+            <Plus className="size-3" /> Doładuj
+          </Button>
+        </div>
+
+        {credit.isPending ? (
+          <div className="h-12 bg-bg-elevated/40 rounded animate-pulse mt-3" />
+        ) : d ? (
+          <>
+            <div className="mt-3 flex flex-wrap gap-x-8 gap-y-1 text-[13px]">
+              <div><span className="text-text-dim">Doładowano: </span><span className="font-semibold">{usd(d.toppedUp)}</span></div>
+              <div><span className="text-text-dim">Wydane: </span><span className="font-semibold">{usd(d.spent)}</span></div>
+              <div>
+                <span className="text-text-dim">Pozostało: </span>
+                <span className={cn('font-semibold', d.remaining <= 0 ? 'text-error' : pct >= 80 ? 'text-warning' : 'text-success')}>
+                  {usd(d.remaining)}
+                </span>
+              </div>
+            </div>
+            <div className="mt-2 h-2 bg-bg-elevated rounded-full overflow-hidden">
+              <div className={cn('h-full rounded-full', pct >= 100 ? 'bg-error' : pct >= 80 ? 'bg-warning' : 'bg-accent')} style={{ width: `${pct}%` }} />
+            </div>
+
+            {d.topups.length > 0 && (
+              <div className="mt-4 border-t border-border pt-3">
+                <div className="text-[11px] uppercase tracking-wider text-text-dim font-semibold mb-2">Historia doładowań</div>
+                <div className="space-y-1">
+                  {d.topups.map((t) => (
+                    <div key={t.id} className="flex items-center justify-between text-[12.5px] bg-bg-elevated rounded-md px-3 py-1.5">
+                      <span className={cn('font-medium mono', t.amountUsd < 0 ? 'text-warning' : 'text-success')}>
+                        {t.amountUsd < 0 ? '' : '+'}{usd(t.amountUsd)}
+                      </span>
+                      <span className="text-text-muted flex-1 px-3 truncate">{t.note ?? ''}</span>
+                      <span className="text-text-dim">{new Date(t.createdAt).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+        ) : (
+          <div className="text-[12px] text-text-dim mt-3">Nie udało się pobrać stanu portfela.</div>
+        )}
+      </CardBody>
+
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogHeader title="Doładuj portfel AI" description="Wpisz ile doładowałeś u dostawcy. Kwota ujemna = korekta." onClose={() => setOpen(false)} />
+        <form onSubmit={submit}>
+          <DialogBody className="space-y-3">
+            <Field label="Kwota ($) *">
+              <Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="5.00" inputMode="decimal" autoFocus />
+            </Field>
+            <Field label="Notatka (opcj.)">
+              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="np. doładowanie OpenAI 01.06" />
+            </Field>
+            {error && <div className="text-[12px] text-error bg-error/10 border border-error/20 rounded-md px-3 py-2">{error}</div>}
+          </DialogBody>
+          <DialogFooter>
+            <Button type="button" variant="secondary" onClick={() => setOpen(false)}>Anuluj</Button>
+            <Button type="submit" disabled={addTopup.isPending || !amount}>{addTopup.isPending ? 'Zapisuję…' : 'Zapisz'}</Button>
+          </DialogFooter>
+        </form>
+      </Dialog>
+    </Card>
+  );
+}
+
 function OrganizationCard({ org, onAddBot }: { org: OrganizationRow; onAddBot: () => void }) {
   const unlimited = org.effectiveLimit === -1;
   const pct = unlimited || org.effectiveLimit === 0
@@ -267,12 +377,18 @@ function OrganizationCard({ org, onAddBot }: { org: OrganizationRow; onAddBot: (
           </div>
         </div>
 
-        <div className="mt-3 text-[12px]">
-          <span className="text-text-dim">Wiadomości (limit wspólny): </span>
-          <span className={cn('font-medium', pct >= 100 && 'text-error', pct >= 80 && pct < 100 && 'text-warning')}>
-            {org.userMessages.toLocaleString('pl-PL')}
-          </span>
-          <span className="text-text-dim"> / {unlimited ? '∞' : org.effectiveLimit.toLocaleString('pl-PL')}</span>
+        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-1 text-[12px]">
+          <div>
+            <span className="text-text-dim">Wiadomości (limit wspólny): </span>
+            <span className={cn('font-medium', pct >= 100 && 'text-error', pct >= 80 && pct < 100 && 'text-warning')}>
+              {org.userMessages.toLocaleString('pl-PL')}
+            </span>
+            <span className="text-text-dim"> / {unlimited ? '∞' : org.effectiveLimit.toLocaleString('pl-PL')}</span>
+          </div>
+          <div className="text-text-dim">
+            Tokeny (mies.): <span className="text-text-muted font-medium">{(org.tokensUsed ?? 0).toLocaleString('pl-PL')}</span>
+            {' · '}koszt: <span className="text-text-muted font-medium">{usd(org.costUsd ?? 0)}</span>
+          </div>
         </div>
 
         <div className="mt-3 border-t border-border pt-3">

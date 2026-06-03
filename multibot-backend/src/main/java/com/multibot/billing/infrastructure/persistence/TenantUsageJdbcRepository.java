@@ -1,5 +1,6 @@
 package com.multibot.billing.infrastructure.persistence;
 
+import com.multibot.billing.domain.model.OrgTokenCost;
 import com.multibot.billing.domain.model.TenantUsage;
 import com.multibot.billing.domain.port.out.TenantUsageRepository;
 import com.multibot.shared.tenant.TenantId;
@@ -67,6 +68,26 @@ class TenantUsageJdbcRepository implements TenantUsageRepository {
                 Long.class,
                 tenantId.value(), Date.valueOf(periodMonth));
         return newValue == null ? 0L : newValue;
+    }
+
+    @Override
+    public BigDecimal sumAllCost() {
+        BigDecimal sum = jdbc.queryForObject(
+                "SELECT COALESCE(SUM(cost_usd), 0) FROM tenant_usage", BigDecimal.class);
+        return sum == null ? BigDecimal.ZERO : sum;
+    }
+
+    @Override
+    public OrgTokenCost sumTokensCostForOrgOf(TenantId tenantId, LocalDate periodMonth) {
+        return jdbc.queryForObject("""
+                SELECT COALESCE(SUM(tu.tokens_used), 0) AS toks, COALESCE(SUM(tu.cost_usd), 0) AS cost
+                FROM tenants sibling
+                LEFT JOIN tenant_usage tu
+                       ON tu.tenant_id = sibling.id AND tu.period_month = ?
+                WHERE sibling.organization_id = (SELECT organization_id FROM tenants WHERE id = ?)
+                """,
+                (rs, rowNum) -> new OrgTokenCost(rs.getLong("toks"), rs.getBigDecimal("cost")),
+                Date.valueOf(periodMonth), tenantId.value());
     }
 
     @Override

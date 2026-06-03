@@ -3,6 +3,7 @@ package com.multibot.billing.application;
 import com.multibot.billing.domain.model.BillingPlan;
 import com.multibot.billing.domain.model.BotLimitDecision;
 import com.multibot.billing.domain.model.MessageLimitDecision;
+import com.multibot.billing.domain.model.OrgTokenCost;
 import com.multibot.billing.domain.model.TenantPlanInfo;
 import com.multibot.billing.domain.model.TenantUsage;
 import com.multibot.billing.domain.port.in.CheckBotLimitUseCase;
@@ -71,6 +72,12 @@ class BillingService implements CheckMessageLimitUseCase, IncrementUsageUseCase,
     @Transactional(readOnly = true)
     public TenantUsage getCurrentUsage(TenantId tenantId) {
         return usageRepository.findCurrent(tenantId, currentPeriodMonth());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public OrgTokenCost getOrgTokenCost(TenantId anyBotOfOrg) {
+        return usageRepository.sumTokensCostForOrgOf(anyBotOfOrg, currentPeriodMonth());
     }
 
     @Override

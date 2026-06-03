@@ -1,5 +1,6 @@
 package com.multibot.billing.domain.port.out;
 
+import com.multibot.billing.domain.model.OrgTokenCost;
 import com.multibot.billing.domain.model.TenantUsage;
 import com.multibot.shared.tenant.TenantId;
 
@@ -27,4 +28,10 @@ public interface TenantUsageRepository {
      * UPSERT + atomowy +1 do ai_messages, +N tokens_used, +N.NNNN cost_usd.
      */
     void incrementAiMessages(TenantId tenantId, LocalDate periodMonth, long tokensUsed, BigDecimal costUsd);
+
+    /** Suma cost_usd wszystkich botow wszystkich organizacji od poczatku (all-time) — wydane z portfela AI. */
+    BigDecimal sumAllCost();
+
+    /** [tokens_used, cost_usd] sumarycznie dla botow organizacji (po anyBot) w danym miesiacu. */
+    OrgTokenCost sumTokensCostForOrgOf(TenantId tenantId, LocalDate periodMonth);
 }

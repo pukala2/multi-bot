@@ -3,11 +3,18 @@ package com.multibot.superadmin.api;
 import com.multibot.api.generated.api.SuperAdminApi;
 import com.multibot.api.generated.model.AddBotRequest;
 import com.multibot.api.generated.model.AddBotResponse;
+import com.multibot.api.generated.model.AddTopupRequest;
+import com.multibot.api.generated.model.AiCreditSummaryResponse;
+import com.multibot.api.generated.model.AiCreditTopupRow;
 import com.multibot.api.generated.model.CreateOrganizationRequest;
 import com.multibot.api.generated.model.OrganizationBotRow;
 import com.multibot.api.generated.model.OrganizationRow;
 import com.multibot.api.generated.model.ProvisionResponse;
+import com.multibot.auth.infrastructure.security.MultibotUserDetails;
+import com.multibot.billing.domain.model.AiCreditSummary;
+import com.multibot.billing.domain.model.OrgTokenCost;
 import com.multibot.billing.domain.port.in.GetUsageUseCase;
+import com.multibot.billing.domain.port.in.ManageAiCreditUseCase;
 import com.multibot.bots.domain.port.in.AddBotUseCase;
 import com.multibot.bots.domain.port.in.AddBotUseCase.AddBotResult;
 import com.multibot.organization.domain.model.Organization;
@@ -20,6 +27,8 @@ import com.multibot.superadmin.domain.port.in.ProvisionOrganizationUseCase.Provi
 import com.multibot.tenant.domain.model.Tenant;
 import com.multibot.tenant.domain.port.in.ListTenantsUseCase;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.List;
@@ -37,17 +46,47 @@ class SuperAdminController implements SuperAdminApi {
     private final ProvisionOrganizationUseCase provisionOrganization;
     private final AddBotUseCase addBot;
     private final GetUsageUseCase getUsage;
+    private final ManageAiCreditUseCase aiCredit;
 
     SuperAdminController(ListOrganizationsUseCase listOrganizations,
                          ListTenantsUseCase listTenants,
                          ProvisionOrganizationUseCase provisionOrganization,
                          AddBotUseCase addBot,
-                         GetUsageUseCase getUsage) {
+                         GetUsageUseCase getUsage,
+                         ManageAiCreditUseCase aiCredit) {
         this.listOrganizations = listOrganizations;
         this.listTenants = listTenants;
         this.provisionOrganization = provisionOrganization;
         this.addBot = addBot;
         this.getUsage = getUsage;
+        this.aiCredit = aiCredit;
+    }
+
+    @Override
+    public ResponseEntity<AiCreditSummaryResponse> getAiCredit() {
+        return ResponseEntity.ok(toAiCreditResponse(aiCredit.summary()));
+    }
+
+    @Override
+    public ResponseEntity<AiCreditSummaryResponse> addAiCreditTopup(AddTopupRequest req) {
+        AiCreditSummary s = aiCredit.addTopup(req.getAmount(), req.getNote(), currentUserId());
+        return ResponseEntity.ok(toAiCreditResponse(s));
+    }
+
+    private static UUID currentUserId() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        return (auth != null && auth.getPrincipal() instanceof MultibotUserDetails d) ? d.userId().value() : null;
+    }
+
+    private static AiCreditSummaryResponse toAiCreditResponse(AiCreditSummary s) {
+        AiCreditSummaryResponse resp = new AiCreditSummaryResponse(
+                s.toppedUp(), s.spent(), s.remaining(),
+                s.topups().stream().map(t -> {
+                    AiCreditTopupRow row = new AiCreditTopupRow(t.id(), t.amountUsd(), t.createdAt().toString());
+                    row.setNote(t.note());
+                    return row;
+                }).toList());
+        return resp;
     }
 
     @Override
@@ -87,11 +126,16 @@ class SuperAdminController implements SuperAdminApi {
 
         long pooledUsed = 0;
         int effectiveLimit = -1;
+        long tokensUsed = 0;
+        java.math.BigDecimal costUsd = java.math.BigDecimal.ZERO;
         if (!bots.isEmpty()) {
             TenantId anyBot = bots.getFirst().id();
             try {
                 pooledUsed = getUsage.getPooledUsedMessages(anyBot);
                 effectiveLimit = getUsage.getEffectiveLimit(anyBot);
+                OrgTokenCost tc = getUsage.getOrgTokenCost(anyBot);
+                tokensUsed = tc.tokensUsed();
+                costUsd = tc.costUsd();
             } catch (RuntimeException ignored) {
                 // organizacja bez planu w billing_plans — pokaz bez zuzycia
             }
@@ -109,6 +153,8 @@ class SuperAdminController implements SuperAdminApi {
                 org.createdAt().toString());
         row.setCompanyName(org.companyName());
         row.setNip(org.nip());
+        row.setTokensUsed(tokensUsed);
+        row.setCostUsd(costUsd);
         return row;
     }
 

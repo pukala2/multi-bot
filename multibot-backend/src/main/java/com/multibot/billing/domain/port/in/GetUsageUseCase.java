@@ -1,6 +1,7 @@
 package com.multibot.billing.domain.port.in;
 
 import com.multibot.billing.domain.model.BillingPlan;
+import com.multibot.billing.domain.model.OrgTokenCost;
 import com.multibot.billing.domain.model.TenantUsage;
 import com.multibot.shared.tenant.TenantId;
 
@@ -11,6 +12,9 @@ public interface GetUsageUseCase {
 
     /** Suma user_messages wszystkich botow organizacji w biezacym miesiacu — to liczy sie do limitu. */
     long getPooledUsedMessages(TenantId tenantId);
+
+    /** Tokeny + koszt organizacji (suma botow) w biezacym miesiacu — diagnostyka super admina. */
+    OrgTokenCost getOrgTokenCost(TenantId anyBotOfOrg);
 
     /** Plan przypisany organizacji bota. */
     BillingPlan getPlan(TenantId tenantId);

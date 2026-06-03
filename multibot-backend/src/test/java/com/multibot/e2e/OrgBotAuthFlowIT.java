@@ -12,7 +12,9 @@ import org.springframework.test.context.TestPropertySource;
 import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.Matchers.equalTo;
+import static org.hamcrest.Matchers.greaterThanOrEqualTo;
 import static org.hamcrest.Matchers.hasItem;
 import static org.hamcrest.Matchers.hasItems;
 import static org.hamcrest.Matchers.notNullValue;
@@ -250,7 +252,41 @@ class OrgBotAuthFlowIT extends IntegrationTestBase {
                 .body("origins", hasItem("https://silesiaszymanow.pl"));
     }
 
+    @Test
+    @DisplayName("Portfel AI: doładowanie zwiększa toppedUp, pozostało = toppedUp − spent; owner dostaje 403")
+    void aiCredit_topupAndAccess() {
+        // owner (nie super admin) -> 403
+        Sess owner = loginAs(OWNER_EMAIL, OWNER_PASS);
+        given().filter(owner.cookies()).when().get("/api/super-admin/ai-credit").then().statusCode(403);
+
+        Sess sa = loginAs(SA_EMAIL, SA_PASS);
+        ExtractableResponse<Response> initial = given().filter(sa.cookies()).when().get("/api/super-admin/ai-credit").then()
+                .statusCode(200)
+                .body("topups", notNullValue())
+                .extract();
+        float before = num(initial, "toppedUp");
+
+        ExtractableResponse<Response> after = given().filter(sa.cookies())
+                .header("X-XSRF-TOKEN", sa.csrf()).contentType(ContentType.JSON)
+                .body("{\"amount\":5.00,\"note\":\"test doładowanie\"}")
+                .when().post("/api/super-admin/ai-credit/topups").then()
+                .statusCode(200)
+                .body("topups.size()", greaterThanOrEqualTo(1))
+                .extract();
+
+        float toppedUp = num(after, "toppedUp");
+        float spent = num(after, "spent");
+        float remaining = num(after, "remaining");
+        assertThat(toppedUp).isCloseTo(before + 5f, org.assertj.core.data.Offset.offset(0.001f));
+        assertThat(remaining).isCloseTo(toppedUp - spent, org.assertj.core.data.Offset.offset(0.001f));
+    }
+
     // --- helpers ---
+
+    /** JSON number → float (RestAssured zwraca Integer dla 0, Float dla 5.0 — ujednolicamy). */
+    private static float num(ExtractableResponse<Response> resp, String path) {
+        return ((Number) resp.path(path)).floatValue();
+    }
 
     /** Sesja zalogowanego usera: jar ciasteczek + aktualny token CSRF (po rotacji przy loginie). */
     private record Sess(CookieFilter cookies, String csrf) {
