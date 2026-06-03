@@ -29,9 +29,15 @@ public interface TenantUsageRepository {
      */
     void incrementAiMessages(TenantId tenantId, LocalDate periodMonth, long tokensUsed, BigDecimal costUsd);
 
-    /** Suma cost_usd wszystkich botow wszystkich organizacji od poczatku (all-time) — wydane z portfela AI. */
-    BigDecimal sumAllCost();
+    /** Suma cost_usd (czat / Anthropic) all-time — wydane z portfela ANTHROPIC. */
+    BigDecimal sumAllChatCost();
 
-    /** [tokens_used, cost_usd] sumarycznie dla botow organizacji (po anyBot) w danym miesiacu. */
+    /** Suma embedding_cost (OpenAI) all-time — wydane z portfela OPENAI. */
+    BigDecimal sumAllEmbeddingCost();
+
+    /** UPSERT + dolicz embedding_tokens + embedding_cost (OpenAI) w danym miesiacu. */
+    void incrementEmbeddingUsage(TenantId tenantId, LocalDate periodMonth, long tokens, BigDecimal cost);
+
+    /** [tokeny czat+embedding, koszt czat+embedding] dla botow organizacji (po anyBot) w danym miesiacu. */
     OrgTokenCost sumTokensCostForOrgOf(TenantId tenantId, LocalDate periodMonth);
 }

@@ -3,6 +3,7 @@ package com.multibot.indexing.application;
 import com.multibot.document.domain.model.Document;
 import com.multibot.document.domain.model.DocumentId;
 import com.multibot.document.domain.model.DocumentStatus;
+import com.multibot.billing.domain.port.in.IncrementUsageUseCase;
 import com.multibot.document.domain.port.in.GetDocumentUseCase;
 import com.multibot.file.domain.model.FileContent;
 import com.multibot.file.domain.port.in.ReadFileUseCase;
@@ -26,6 +27,7 @@ import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
@@ -34,6 +36,10 @@ import java.util.Map;
 class IndexingService implements IndexDocumentUseCase {
 
     private static final Logger log = LoggerFactory.getLogger(IndexingService.class);
+
+    // text-embedding-3-small: $0.02 / 1M tokenów. Tokeny ≈ znaki/4 (szacunek, do diagnostyki).
+    private static final double EMBEDDING_COST_PER_TOKEN_USD = 0.00000002;
+    private static final double CHARS_PER_TOKEN = 4.0;
 
     private final GetDocumentUseCase getDocumentUseCase;
     private final ReadFileUseCase readFileUseCase;
@@ -44,6 +50,7 @@ class IndexingService implements IndexDocumentUseCase {
     private final DeleteChunksByDocumentUseCase deleteChunksUseCase;
     private final IndexingJobRepository jobRepository;
     private final com.multibot.document.domain.port.in.UpdateDocumentStatusUseCase updateDocumentStatus;
+    private final IncrementUsageUseCase incrementUsage;
     private final ApplicationEventPublisher events;
 
     IndexingService(GetDocumentUseCase getDocumentUseCase,
@@ -55,6 +62,7 @@ class IndexingService implements IndexDocumentUseCase {
                     DeleteChunksByDocumentUseCase deleteChunksUseCase,
                     IndexingJobRepository jobRepository,
                     com.multibot.document.domain.port.in.UpdateDocumentStatusUseCase updateDocumentStatus,
+                    IncrementUsageUseCase incrementUsage,
                     ApplicationEventPublisher events) {
         this.getDocumentUseCase = getDocumentUseCase;
         this.readFileUseCase = readFileUseCase;
@@ -65,6 +73,7 @@ class IndexingService implements IndexDocumentUseCase {
         this.deleteChunksUseCase = deleteChunksUseCase;
         this.jobRepository = jobRepository;
         this.updateDocumentStatus = updateDocumentStatus;
+        this.incrementUsage = incrementUsage;
         this.events = events;
     }
 
@@ -132,7 +141,21 @@ class IndexingService implements IndexDocumentUseCase {
         List<Chunk> chunks = buildChunks(document, chunkTexts, tenant, now);
 
         storeChunksUseCase.storeAll(chunks);
+        recordEmbeddingUsage(tenant, chunkTexts);
         return chunks.size();
+    }
+
+    /** Szacunkowe zużycie OpenAI (embeddingi) — tokeny ≈ suma znaków chunków / 4. */
+    private void recordEmbeddingUsage(TenantId tenant, List<String> chunkTexts) {
+        try {
+            long chars = chunkTexts.stream().mapToLong(s -> s == null ? 0 : s.length()).sum();
+            long tokens = Math.round(chars / CHARS_PER_TOKEN);
+            BigDecimal cost = BigDecimal.valueOf(tokens * EMBEDDING_COST_PER_TOKEN_USD);
+            incrementUsage.recordEmbeddingUsage(tenant, tokens, cost);
+        } catch (RuntimeException e) {
+            // Liczenie kosztu jest pomocnicze — nie wywracaj indeksacji jak się nie uda.
+            log.warn("Nie udało się zapisać zużycia embeddingów dla tenant {}: {}", tenant, e.getMessage());
+        }
     }
 
     private List<Chunk> buildChunks(Document document, List<String> chunkTexts, TenantId tenant, Instant now) {

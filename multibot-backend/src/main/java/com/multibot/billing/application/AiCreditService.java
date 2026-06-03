@@ -1,6 +1,8 @@
 package com.multibot.billing.application;
 
 import com.multibot.billing.domain.model.AiCreditSummary;
+import com.multibot.billing.domain.model.AiCreditSummary.ProviderWallet;
+import com.multibot.billing.domain.model.AiProvider;
 import com.multibot.billing.domain.port.in.ManageAiCreditUseCase;
 import com.multibot.billing.domain.port.out.AiCreditRepository;
 import com.multibot.billing.domain.port.out.TenantUsageRepository;
@@ -10,12 +12,13 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 
 /**
- * Portfel AI (poziom platformy, tylko super admin):
- *   pozostało = SUMA(doładowania) − SUMA(cost_usd wszystkich botów, all-time).
- * cost_usd to nasz szacunek, nie faktura dostawcy.
+ * Portfel AI per dostawca (poziom platformy, tylko super admin).
+ *   OPENAI: spent = embedding_cost (indeksacja).  ANTHROPIC: spent = cost_usd (czat).
+ *   remaining = toppedUp − spent. spent to NASZ szacunek, nie faktura dostawcy.
  */
 @Service
 class AiCreditService implements ManageAiCreditUseCase {
@@ -31,16 +34,27 @@ class AiCreditService implements ManageAiCreditUseCase {
     @Override
     @Transactional(readOnly = true)
     public AiCreditSummary summary() {
-        BigDecimal toppedUp = creditRepository.sumTopups();
-        BigDecimal spent = usageRepository.sumAllCost();
-        return new AiCreditSummary(toppedUp, spent, toppedUp.subtract(spent), creditRepository.listTopups());
+        ProviderWallet openai = wallet(AiProvider.OPENAI, usageRepository.sumAllEmbeddingCost());
+        ProviderWallet anthropic = wallet(AiProvider.ANTHROPIC, usageRepository.sumAllChatCost());
+
+        BigDecimal totalToppedUp = openai.toppedUp().add(anthropic.toppedUp());
+        BigDecimal totalSpent = openai.spent().add(anthropic.spent());
+        return new AiCreditSummary(
+                List.of(openai, anthropic),
+                totalToppedUp, totalSpent, totalToppedUp.subtract(totalSpent),
+                creditRepository.listTopups());
+    }
+
+    private ProviderWallet wallet(AiProvider provider, BigDecimal spent) {
+        BigDecimal toppedUp = creditRepository.sumTopups(provider);
+        return new ProviderWallet(provider, toppedUp, spent, toppedUp.subtract(spent));
     }
 
     @Override
     @Transactional
-    public AiCreditSummary addTopup(BigDecimal amountUsd, String note, UUID createdBy) {
+    public AiCreditSummary addTopup(AiProvider provider, BigDecimal amountUsd, String note, UUID createdBy) {
         creditRepository.insertTopup(
-                UuidGenerator.newUuidV7(), amountUsd,
+                UuidGenerator.newUuidV7(), provider, amountUsd,
                 (note == null || note.isBlank()) ? null : note.trim(),
                 createdBy, Instant.now());
         return summary();

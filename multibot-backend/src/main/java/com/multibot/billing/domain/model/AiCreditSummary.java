@@ -4,13 +4,22 @@ import java.math.BigDecimal;
 import java.util.List;
 
 /**
- * Stan portfela AI (all-time):
- *   remaining = toppedUp − spent.
- * spent to NASZ szacunek kosztu (cost_usd), nie faktura dostawcy.
+ * Stan portfela AI (all-time), z rozbiciem na dostawców.
+ * Per dostawca: remaining = toppedUp − spent. Totale = sumy po dostawcach.
+ * spent to NASZ szacunek (cost_usd czatu / embedding_cost), nie faktura dostawcy.
  */
 public record AiCreditSummary(
-        BigDecimal toppedUp,
-        BigDecimal spent,
-        BigDecimal remaining,
+        List<ProviderWallet> wallets,
+        BigDecimal totalToppedUp,
+        BigDecimal totalSpent,
+        BigDecimal totalRemaining,
         List<AiCreditTopup> topups
-) {}
+) {
+
+    public record ProviderWallet(
+            AiProvider provider,
+            BigDecimal toppedUp,
+            BigDecimal spent,
+            BigDecimal remaining
+    ) {}
+}

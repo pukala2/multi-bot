@@ -6,6 +6,8 @@ import com.multibot.api.generated.model.AddBotResponse;
 import com.multibot.api.generated.model.AddTopupRequest;
 import com.multibot.api.generated.model.AiCreditSummaryResponse;
 import com.multibot.api.generated.model.AiCreditTopupRow;
+import com.multibot.api.generated.model.AiProviderWallet;
+import com.multibot.billing.domain.model.AiProvider;
 import com.multibot.api.generated.model.CreateOrganizationRequest;
 import com.multibot.api.generated.model.OrganizationBotRow;
 import com.multibot.api.generated.model.OrganizationRow;
@@ -69,7 +71,8 @@ class SuperAdminController implements SuperAdminApi {
 
     @Override
     public ResponseEntity<AiCreditSummaryResponse> addAiCreditTopup(AddTopupRequest req) {
-        AiCreditSummary s = aiCredit.addTopup(req.getAmount(), req.getNote(), currentUserId());
+        AiProvider provider = AiProvider.valueOf(req.getProvider().getValue());
+        AiCreditSummary s = aiCredit.addTopup(provider, req.getAmount(), req.getNote(), currentUserId());
         return ResponseEntity.ok(toAiCreditResponse(s));
     }
 
@@ -79,14 +82,20 @@ class SuperAdminController implements SuperAdminApi {
     }
 
     private static AiCreditSummaryResponse toAiCreditResponse(AiCreditSummary s) {
-        AiCreditSummaryResponse resp = new AiCreditSummaryResponse(
-                s.toppedUp(), s.spent(), s.remaining(),
-                s.topups().stream().map(t -> {
-                    AiCreditTopupRow row = new AiCreditTopupRow(t.id(), t.amountUsd(), t.createdAt().toString());
-                    row.setNote(t.note());
-                    return row;
-                }).toList());
-        return resp;
+        List<AiProviderWallet> wallets = s.wallets().stream()
+                .map(w -> new AiProviderWallet(
+                        AiProviderWallet.ProviderEnum.fromValue(w.provider().name()),
+                        w.toppedUp(), w.spent(), w.remaining()))
+                .toList();
+        List<AiCreditTopupRow> topups = s.topups().stream().map(t -> {
+            AiCreditTopupRow row = new AiCreditTopupRow(
+                    t.id(), AiCreditTopupRow.ProviderEnum.fromValue(t.provider().name()),
+                    t.amountUsd(), t.createdAt().toString());
+            row.setNote(t.note());
+            return row;
+        }).toList();
+        return new AiCreditSummaryResponse(
+                wallets, s.totalToppedUp(), s.totalSpent(), s.totalRemaining(), topups);
     }
 
     @Override

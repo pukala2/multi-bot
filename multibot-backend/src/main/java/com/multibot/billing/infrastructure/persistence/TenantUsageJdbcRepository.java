@@ -71,16 +71,37 @@ class TenantUsageJdbcRepository implements TenantUsageRepository {
     }
 
     @Override
-    public BigDecimal sumAllCost() {
+    public BigDecimal sumAllChatCost() {
         BigDecimal sum = jdbc.queryForObject(
                 "SELECT COALESCE(SUM(cost_usd), 0) FROM tenant_usage", BigDecimal.class);
         return sum == null ? BigDecimal.ZERO : sum;
     }
 
     @Override
+    public BigDecimal sumAllEmbeddingCost() {
+        BigDecimal sum = jdbc.queryForObject(
+                "SELECT COALESCE(SUM(embedding_cost), 0) FROM tenant_usage", BigDecimal.class);
+        return sum == null ? BigDecimal.ZERO : sum;
+    }
+
+    @Override
+    public void incrementEmbeddingUsage(TenantId tenantId, LocalDate periodMonth, long tokens, BigDecimal cost) {
+        jdbc.update("""
+                INSERT INTO tenant_usage (tenant_id, period_month, embedding_tokens, embedding_cost, created_at, updated_at)
+                VALUES (?, ?, ?, ?, now(), now())
+                ON CONFLICT (tenant_id, period_month) DO UPDATE
+                SET embedding_tokens = tenant_usage.embedding_tokens + EXCLUDED.embedding_tokens,
+                    embedding_cost = tenant_usage.embedding_cost + EXCLUDED.embedding_cost,
+                    updated_at = now()
+                """,
+                tenantId.value(), Date.valueOf(periodMonth), tokens, cost);
+    }
+
+    @Override
     public OrgTokenCost sumTokensCostForOrgOf(TenantId tenantId, LocalDate periodMonth) {
         return jdbc.queryForObject("""
-                SELECT COALESCE(SUM(tu.tokens_used), 0) AS toks, COALESCE(SUM(tu.cost_usd), 0) AS cost
+                SELECT COALESCE(SUM(tu.tokens_used + tu.embedding_tokens), 0) AS toks,
+                       COALESCE(SUM(tu.cost_usd + tu.embedding_cost), 0) AS cost
                 FROM tenants sibling
                 LEFT JOIN tenant_usage tu
                        ON tu.tenant_id = sibling.id AND tu.period_month = ?

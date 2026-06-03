@@ -1,17 +1,28 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { readCookie } from '@/api/client';
 
+export type AiProvider = 'OPENAI' | 'ANTHROPIC';
+
 export interface AiCreditTopup {
   id: string;
+  provider: AiProvider;
   amountUsd: number;
   note: string | null;
   createdAt: string;
 }
 
-export interface AiCreditSummary {
+export interface ProviderWallet {
+  provider: AiProvider;
   toppedUp: number;
   spent: number;
   remaining: number;
+}
+
+export interface AiCreditSummary {
+  wallets: ProviderWallet[];
+  totalToppedUp: number;
+  totalSpent: number;
+  totalRemaining: number;
   topups: AiCreditTopup[];
 }
 
@@ -32,7 +43,7 @@ export function useAiCredit() {
 export function useAddTopup() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: async ({ amount, note }: { amount: number; note?: string }): Promise<AiCreditSummary> => {
+    mutationFn: async ({ provider, amount, note }: { provider: AiProvider; amount: number; note?: string }): Promise<AiCreditSummary> => {
       const csrf = readCookie('XSRF-TOKEN');
       const headers: Record<string, string> = { 'Content-Type': 'application/json' };
       if (csrf) headers['X-XSRF-TOKEN'] = csrf;
@@ -40,7 +51,7 @@ export function useAddTopup() {
         method: 'POST',
         headers,
         credentials: 'same-origin',
-        body: JSON.stringify({ amount, note: note || undefined }),
+        body: JSON.stringify({ provider, amount, note: note || undefined }),
       });
       if (!r.ok) {
         let msg = `HTTP ${r.status}`;

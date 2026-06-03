@@ -1,18 +1,19 @@
 package com.multibot.billing.domain.port.out;
 
 import com.multibot.billing.domain.model.AiCreditTopup;
+import com.multibot.billing.domain.model.AiProvider;
 
 import java.math.BigDecimal;
 import java.time.Instant;
-import java.util.List;
 import java.util.UUID;
+import java.util.List;
 
 public interface AiCreditRepository {
 
-    void insertTopup(UUID id, BigDecimal amountUsd, String note, UUID createdBy, Instant createdAt);
+    void insertTopup(UUID id, AiProvider provider, BigDecimal amountUsd, String note, UUID createdBy, Instant createdAt);
 
-    /** Suma wszystkich doładowań (all-time). */
-    BigDecimal sumTopups();
+    /** Suma doładowań danego dostawcy (all-time). */
+    BigDecimal sumTopups(AiProvider provider);
 
     /** Wszystkie wpisy, najnowsze pierwsze. */
     List<AiCreditTopup> listTopups();

@@ -69,6 +69,12 @@ class BillingService implements CheckMessageLimitUseCase, IncrementUsageUseCase,
     }
 
     @Override
+    @Transactional
+    public void recordEmbeddingUsage(TenantId tenantId, long tokens, BigDecimal costUsd) {
+        usageRepository.incrementEmbeddingUsage(tenantId, currentPeriodMonth(), tokens, costUsd);
+    }
+
+    @Override
     @Transactional(readOnly = true)
     public TenantUsage getCurrentUsage(TenantId tenantId) {
         return usageRepository.findCurrent(tenantId, currentPeriodMonth());

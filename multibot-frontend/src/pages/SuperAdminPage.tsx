@@ -246,16 +246,18 @@ export function SuperAdminPage() {
   );
 }
 
+const PROVIDER_LABEL: Record<string, string> = { OPENAI: 'OpenAI (embeddingi)', ANTHROPIC: 'Anthropic (czat)' };
+
 function AiCreditPanel() {
   const credit = useAiCredit();
   const addTopup = useAddTopup();
   const [open, setOpen] = useState(false);
+  const [provider, setProvider] = useState<'OPENAI' | 'ANTHROPIC'>('OPENAI');
   const [amount, setAmount] = useState('');
   const [note, setNote] = useState('');
   const [error, setError] = useState<string | null>(null);
 
   const d = credit.data;
-  const pct = d && d.toppedUp > 0 ? Math.min(100, Math.round((d.spent / d.toppedUp) * 100)) : 0;
 
   async function submit(e: FormEvent) {
     e.preventDefault();
@@ -263,7 +265,7 @@ function AiCreditPanel() {
     const val = parseFloat(amount.replace(',', '.'));
     if (Number.isNaN(val) || val === 0) { setError('Podaj kwotę (np. 5 albo -2 dla korekty)'); return; }
     try {
-      await addTopup.mutateAsync({ amount: val, note: note || undefined });
+      await addTopup.mutateAsync({ provider, amount: val, note: note || undefined });
       setOpen(false); setAmount(''); setNote('');
       toast.success('Doładowanie zapisane');
     } catch (err) {
@@ -290,21 +292,35 @@ function AiCreditPanel() {
         </div>
 
         {credit.isPending ? (
-          <div className="h-12 bg-bg-elevated/40 rounded animate-pulse mt-3" />
+          <div className="h-20 bg-bg-elevated/40 rounded animate-pulse mt-3" />
         ) : d ? (
           <>
-            <div className="mt-3 flex flex-wrap gap-x-8 gap-y-1 text-[13px]">
-              <div><span className="text-text-dim">Doładowano: </span><span className="font-semibold">{usd(d.toppedUp)}</span></div>
-              <div><span className="text-text-dim">Wydane: </span><span className="font-semibold">{usd(d.spent)}</span></div>
-              <div>
-                <span className="text-text-dim">Pozostało: </span>
-                <span className={cn('font-semibold', d.remaining <= 0 ? 'text-error' : pct >= 80 ? 'text-warning' : 'text-success')}>
-                  {usd(d.remaining)}
-                </span>
-              </div>
+            <div className="mt-3 grid grid-cols-2 gap-2">
+              {d.wallets.map((w) => {
+                const pct = w.toppedUp > 0 ? Math.min(100, Math.round((w.spent / w.toppedUp) * 100)) : 0;
+                return (
+                  <div key={w.provider} className="bg-bg-elevated rounded-md px-3 py-2.5">
+                    <div className="text-[12px] font-medium mb-1.5">{PROVIDER_LABEL[w.provider] ?? w.provider}</div>
+                    <div className="flex flex-wrap gap-x-4 gap-y-0.5 text-[12px]">
+                      <span className="text-text-dim">doład. <span className="text-text font-medium">{usd(w.toppedUp)}</span></span>
+                      <span className="text-text-dim">wyd. <span className="text-text font-medium">{usd(w.spent)}</span></span>
+                      <span className="text-text-dim">zost. <span className={cn('font-semibold', w.remaining <= 0 ? 'text-error' : pct >= 80 ? 'text-warning' : 'text-success')}>{usd(w.remaining)}</span></span>
+                    </div>
+                    <div className="mt-1.5 h-1.5 bg-bg-panel rounded-full overflow-hidden">
+                      <div className={cn('h-full rounded-full', pct >= 100 ? 'bg-error' : pct >= 80 ? 'bg-warning' : 'bg-accent')} style={{ width: `${pct}%` }} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-            <div className="mt-2 h-2 bg-bg-elevated rounded-full overflow-hidden">
-              <div className={cn('h-full rounded-full', pct >= 100 ? 'bg-error' : pct >= 80 ? 'bg-warning' : 'bg-accent')} style={{ width: `${pct}%` }} />
+
+            <div className="mt-3 flex flex-wrap gap-x-8 gap-y-1 text-[13px] border-t border-border pt-3">
+              <div><span className="text-text-dim">Razem doładowano: </span><span className="font-semibold">{usd(d.totalToppedUp)}</span></div>
+              <div><span className="text-text-dim">Razem wydane: </span><span className="font-semibold">{usd(d.totalSpent)}</span></div>
+              <div>
+                <span className="text-text-dim">Razem pozostało: </span>
+                <span className={cn('font-semibold', d.totalRemaining <= 0 ? 'text-error' : 'text-success')}>{usd(d.totalRemaining)}</span>
+              </div>
             </div>
 
             {d.topups.length > 0 && (
@@ -312,12 +328,13 @@ function AiCreditPanel() {
                 <div className="text-[11px] uppercase tracking-wider text-text-dim font-semibold mb-2">Historia doładowań</div>
                 <div className="space-y-1">
                   {d.topups.map((t) => (
-                    <div key={t.id} className="flex items-center justify-between text-[12.5px] bg-bg-elevated rounded-md px-3 py-1.5">
+                    <div key={t.id} className="flex items-center gap-3 text-[12.5px] bg-bg-elevated rounded-md px-3 py-1.5">
+                      <Badge variant={t.provider === 'OPENAI' ? 'info' : 'neutral'}>{t.provider}</Badge>
                       <span className={cn('font-medium mono', t.amountUsd < 0 ? 'text-warning' : 'text-success')}>
                         {t.amountUsd < 0 ? '' : '+'}{usd(t.amountUsd)}
                       </span>
-                      <span className="text-text-muted flex-1 px-3 truncate">{t.note ?? ''}</span>
-                      <span className="text-text-dim">{new Date(t.createdAt).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
+                      <span className="text-text-muted flex-1 truncate">{t.note ?? ''}</span>
+                      <span className="text-text-dim shrink-0">{new Date(t.createdAt).toLocaleString('pl-PL', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' })}</span>
                     </div>
                   ))}
                 </div>
@@ -330,14 +347,24 @@ function AiCreditPanel() {
       </CardBody>
 
       <Dialog open={open} onOpenChange={setOpen}>
-        <DialogHeader title="Doładuj portfel AI" description="Wpisz ile doładowałeś u dostawcy. Kwota ujemna = korekta." onClose={() => setOpen(false)} />
+        <DialogHeader title="Doładuj portfel AI" description="Wybierz dostawcę i wpisz ile doładowałeś. Kwota ujemna = korekta." onClose={() => setOpen(false)} />
         <form onSubmit={submit}>
           <DialogBody className="space-y-3">
+            <Field label="Dostawca *">
+              <select
+                value={provider}
+                onChange={(e) => setProvider(e.target.value as 'OPENAI' | 'ANTHROPIC')}
+                className="h-8 w-full rounded-md border border-border bg-bg-panel px-3 text-[13px] text-text focus-visible:outline-none focus-visible:border-accent"
+              >
+                <option value="OPENAI">OpenAI (embeddingi)</option>
+                <option value="ANTHROPIC">Anthropic (czat)</option>
+              </select>
+            </Field>
             <Field label="Kwota ($) *">
               <Input value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="5.00" inputMode="decimal" autoFocus />
             </Field>
             <Field label="Notatka (opcj.)">
-              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="np. doładowanie OpenAI 01.06" />
+              <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="np. doładowanie 01.06" />
             </Field>
             {error && <div className="text-[12px] text-error bg-error/10 border border-error/20 rounded-md px-3 py-2">{error}</div>}
           </DialogBody>

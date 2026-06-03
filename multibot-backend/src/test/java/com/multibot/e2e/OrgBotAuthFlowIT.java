@@ -253,8 +253,8 @@ class OrgBotAuthFlowIT extends IntegrationTestBase {
     }
 
     @Test
-    @DisplayName("Portfel AI: doładowanie zwiększa toppedUp, pozostało = toppedUp − spent; owner dostaje 403")
-    void aiCredit_topupAndAccess() {
+    @DisplayName("Portfel AI per dostawca: doładowanie OPENAI zwiększa total; total = suma portfeli; owner dostaje 403")
+    void aiCredit_topupPerProvider() {
         // owner (nie super admin) -> 403
         Sess owner = loginAs(OWNER_EMAIL, OWNER_PASS);
         given().filter(owner.cookies()).when().get("/api/super-admin/ai-credit").then().statusCode(403);
@@ -262,23 +262,26 @@ class OrgBotAuthFlowIT extends IntegrationTestBase {
         Sess sa = loginAs(SA_EMAIL, SA_PASS);
         ExtractableResponse<Response> initial = given().filter(sa.cookies()).when().get("/api/super-admin/ai-credit").then()
                 .statusCode(200)
-                .body("topups", notNullValue())
+                .body("wallets.size()", equalTo(2))
+                .body("wallets.provider", hasItems("OPENAI", "ANTHROPIC"))
                 .extract();
-        float before = num(initial, "toppedUp");
+        float beforeTotal = num(initial, "totalToppedUp");
 
         ExtractableResponse<Response> after = given().filter(sa.cookies())
                 .header("X-XSRF-TOKEN", sa.csrf()).contentType(ContentType.JSON)
-                .body("{\"amount\":5.00,\"note\":\"test doładowanie\"}")
+                .body("{\"provider\":\"OPENAI\",\"amount\":5.00,\"note\":\"OpenAI 01.06\"}")
                 .when().post("/api/super-admin/ai-credit/topups").then()
                 .statusCode(200)
-                .body("topups.size()", greaterThanOrEqualTo(1))
+                .body("topups.find { it.provider == 'OPENAI' }.amountUsd", notNullValue())
                 .extract();
 
-        float toppedUp = num(after, "toppedUp");
-        float spent = num(after, "spent");
-        float remaining = num(after, "remaining");
-        assertThat(toppedUp).isCloseTo(before + 5f, org.assertj.core.data.Offset.offset(0.001f));
-        assertThat(remaining).isCloseTo(toppedUp - spent, org.assertj.core.data.Offset.offset(0.001f));
+        float totalToppedUp = num(after, "totalToppedUp");
+        float totalSpent = num(after, "totalSpent");
+        float totalRemaining = num(after, "totalRemaining");
+        float openaiTopped = num(after, "wallets.find { it.provider == 'OPENAI' }.toppedUp");
+        assertThat(totalToppedUp).isCloseTo(beforeTotal + 5f, org.assertj.core.data.Offset.offset(0.001f));
+        assertThat(openaiTopped).isGreaterThanOrEqualTo(5f);
+        assertThat(totalRemaining).isCloseTo(totalToppedUp - totalSpent, org.assertj.core.data.Offset.offset(0.001f));
     }
 
     // --- helpers ---

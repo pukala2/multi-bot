@@ -776,21 +776,32 @@ export interface components {
         AiCreditTopupRow: {
             /** Format: uuid */
             id: string;
+            /** @enum {string} */
+            provider: "OPENAI" | "ANTHROPIC";
             amountUsd: number;
             note?: string | null;
             /** @description ISO 8601 (instant). */
             createdAt: string;
         };
-        AiCreditSummaryResponse: {
-            /** @description Suma doładowań ($, all-time). */
+        AiProviderWallet: {
+            /** @enum {string} */
+            provider: "OPENAI" | "ANTHROPIC";
             toppedUp: number;
-            /** @description Szacowany koszt AI ($, all-time, wszystkie organizacje). */
             spent: number;
-            /** @description toppedUp − spent. */
             remaining: number;
+        };
+        AiCreditSummaryResponse: {
+            /** @description Portfel per dostawca. */
+            wallets: components["schemas"]["AiProviderWallet"][];
+            totalToppedUp: number;
+            /** @description Szacowany koszt AI ($, all-time, wszyscy dostawcy + organizacje). */
+            totalSpent: number;
+            totalRemaining: number;
             topups: components["schemas"]["AiCreditTopupRow"][];
         };
         AddTopupRequest: {
+            /** @enum {string} */
+            provider: "OPENAI" | "ANTHROPIC";
             /** @description Kwota doładowania w $ (ujemna = korekta). */
             amount: number;
             note?: string | null;
